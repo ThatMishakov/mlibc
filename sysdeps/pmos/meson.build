@@ -111,7 +111,7 @@ libc_sources += files(
 libc_include_dirs += include_directories('include')
 
 if not headers_only
-	crtstuff = ['crt1', 'Scrt1']
+	crtstuff = ['crt1', 'Scrt1', 'crti', 'crtn']
 	foreach crtthing : crtstuff
 		crtf = crtthing + '.S'
 		crt_src = files(host_machine.cpu_family() / crtf)
