@@ -61,6 +61,7 @@ libc_sources += files(
 	'generic/utmpx.cpp',
 	'generic/monetary.cpp',
 	'generic/aio.cpp',
+	'generic/nl_types.cpp',
 )
 
 if not headers_only
