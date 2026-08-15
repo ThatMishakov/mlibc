@@ -13,4 +13,10 @@
 #define AT_EXECFN 31
 #define AT_SYSINFO_EHDR 33
 
+#define	AT_USRSTACKBASE	35
+#define	AT_USRSTACKLIM  36
+
+#define AT_MEM_OBJ_ID 40
+#define AT_TASK_GROUP_ID 41
+
 #endif /* _ABIBITS_AUXV_H */
