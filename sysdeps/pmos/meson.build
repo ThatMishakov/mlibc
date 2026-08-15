@@ -1,0 +1,128 @@
+sysdep_supported_options = {
+    'posix': true,
+	'glibc': true,
+    'bsd': true,
+}
+
+if not no_headers
+	install_headers(
+		'include/abi-bits/auxv.h',
+		'include/abi-bits/blkcnt_t.h',
+		'include/abi-bits/blksize_t.h',
+		'include/abi-bits/clockid_t.h',
+		'include/abi-bits/dev_t.h',
+		'include/abi-bits/errno.h',
+		'include/abi-bits/fcntl.h',
+		'include/abi-bits/gid_t.h',
+		'include/abi-bits/ino_t.h',
+		'include/abi-bits/limits.h',
+		'include/abi-bits/mode_t.h',
+		'include/abi-bits/nlink_t.h',
+		'include/abi-bits/pid_t.h',
+		'include/abi-bits/seek-whence.h',
+		'include/abi-bits/signal.h',
+		'include/abi-bits/stat.h',
+		'include/abi-bits/uid_t.h',
+		'include/abi-bits/vm-flags.h',
+		'include/abi-bits/wait.h',
+		'include/abi-bits/riscv-hwprobe.h',
+		'include/abi-bits/sigevent.h',
+		'include/abi-bits/sigval.h',
+		'include/abi-bits/sa_family_t.h',
+		'include/abi-bits/sockaddr_storage.h',
+		'include/abi-bits/sig-limits.h',
+		'include/abi-bits/suseconds_t.h',
+		'include/abi-bits/access.h',
+		'include/abi-bits/socklen_t.h',
+		'include/abi-bits/socket.h',
+		'include/abi-bits/poll.h',
+		'include/abi-bits/resource.h',
+		'include/abi-bits/in.h',
+		'include/abi-bits/rlim_t.h',
+		'include/abi-bits/utsname.h',
+		'include/abi-bits/fd_set.h',
+		'include/abi-bits/sem.h',
+		'include/abi-bits/time.h',
+		'include/abi-bits/ipc.h',
+		'include/abi-bits/statvfs.h',
+		'include/abi-bits/fsblkcnt_t.h',
+		'include/abi-bits/fsfilcnt_t.h',
+		'include/abi-bits/shm.h',
+		'include/abi-bits/termios.h',
+		'include/abi-bits/msg.h',
+		'include/abi-bits/mqueue.h',
+		'include/abi-bits/utmp-defines.h',
+		'include/abi-bits/utmpx.h',
+		'include/abi-bits/sigset_t.h',
+		'include/abi-bits/aio.h',
+		'include/abi-bits/sched_param.h',
+		'include/abi-bits/ioctls.h',
+		subdir: 'abi-bits',
+		follow_symlinks: true
+	)
+
+    if host_machine.cpu_family() == 'riscv64'
+		install_headers(
+			'include/abi-bits/riscv-hwprobe.h',
+			subdir: 'abi-bits',
+			follow_symlinks: true,
+		)
+	endif
+
+    install_headers(
+        'include/pmos/interrupts.h',
+        'include/pmos/io.h',
+        'include/pmos/ipc.h',
+        'include/pmos/load_data.h',
+        'include/pmos/memory.h',
+        'include/pmos/ports.h',
+        'include/pmos/special.h',
+        'include/pmos/system.h',
+		'include/pmos/special.h',
+        subdir: 'pmos',
+        follow_symlinks: true
+    )
+
+    install_headers(
+        'include/kernel/attributes.h',
+        'include/kernel/block.h',
+        'include/kernel/elf.h',
+        'include/kernel/flags.h',
+        'include/kernel/messaging.h',
+        'include/kernel/syscalls.h',
+        'include/kernel/sysinfo.h',
+        'include/kernel/types.h',
+        subdir: 'kernel',
+        follow_symlinks: true
+    )
+endif
+
+rtld_sources += files(
+	'generic/sysdeps.cpp',
+	'generic/syscalls.cpp',
+)
+rtld_include_dirs += include_directories('include')
+
+libc_sources += files(
+	'generic/entry.cpp',
+	'generic/sysdeps.cpp',
+	'generic/syscalls.cpp',
+)
+libc_include_dirs += include_directories('include')
+
+if not headers_only
+	crtstuff = ['crt1', 'Scrt1']
+	foreach crtthing : crtstuff
+		crtf = crtthing + '.S'
+		crt_src = files(host_machine.cpu_family() / crtf)
+		crt = custom_target(
+			crtthing,
+			build_by_default: true,
+			command: c_compiler.cmd_array() + ['-c', '-o', '@OUTPUT@', '@INPUT@'],
+			input: crt_src,
+			output: crtthing + '.o',
+			install: true,
+			install_dir: get_option('libdir'),
+		)
+	endforeach
+endif
