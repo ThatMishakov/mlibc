@@ -86,7 +86,6 @@ if not no_headers
     install_headers(
         'include/kernel/attributes.h',
         'include/kernel/block.h',
-        'include/kernel/elf.h',
         'include/kernel/flags.h',
         'include/kernel/messaging.h',
         'include/kernel/syscalls.h',
@@ -107,6 +106,7 @@ libc_sources += files(
 	'generic/entry.cpp',
 	'generic/sysdeps.cpp',
 	'generic/syscalls.cpp',
+	'generic/helpers.cpp',
 )
 libc_include_dirs += include_directories('include')
 
