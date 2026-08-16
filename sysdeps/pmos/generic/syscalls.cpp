@@ -3,6 +3,7 @@
 #include <pmos/system.h>
 #include <pmos/memory.h>
 #include <pmos/ports.h>
+#include <pmos/interrupts.h>
 #include <errno.h>
 
 // TODO: This should probably be a separate library
@@ -146,5 +147,167 @@ result_t syscall_get_message_info(Message_Descriptor *descr, uint64_t port, uint
 #endif
 }
 
+right_request_t send_message_right(pmos_right_t send_right, pmos_port_t reply_port, const void *message,
+                             size_t message_size, message_extra_t *aux_stuff, unsigned flags)
+{
+    syscall_r result;
+#ifdef __32BITSYSCALL
+    result = __pmos_syscall32_7words(SYSCALL_SEND_MSG_RIGHT | (flags << 8), send_right, reply_port,
+                                   message, message_size, aux_stuff);
+#else
+    result = syscall5(SYSCALL_SEND_MSG_RIGHT | (flags << 8), send_right, reply_port, reinterpret_cast<uintptr_t>(message),
+                        message_size, reinterpret_cast<uintptr_t>(aux_stuff));
+#endif
+    return (right_request_t) {
+        .result = static_cast<result_t>(result.result),
+        .right = result.value,
+    };
+}
+
+result_t set_affinity(uint64_t tid, uint32_t cpu_id, unsigned flags)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_3words(SYSCALL_SET_AFFINITY | (flags << 8), tid, cpu_id).result;
+#else
+    return syscall2(SYSCALL_SET_AFFINITY | (flags << 8), tid, cpu_id).result;
+#endif
+}
+
+right_request_t allocate_interrupt(uint32_t gsi, uint32_t flags)
+{
+    syscall_r result;
+#ifdef __32BITSYSCALL
+    result = __pmos_syscall32_1words(SYSCALL_ALLOCATE_INTERRUPT | (flags << 8), gsi);
+#else
+    result = syscall1(SYSCALL_ALLOCATE_INTERRUPT | (flags << 8), gsi);
+#endif
+    return (right_request_t) {
+        .result = static_cast<result_t>(result.result),
+        .right = result.value,
+    };
+}
+
+right_request_t dup_right(pmos_right_t right)
+{
+    syscall_r result;
+    #ifdef __32BITSYSCALL
+    result = __pmos_syscall32_2words(SYSCALL_DUP_RIGHT, right);
+    #else
+    result = syscall1(SYSCALL_DUP_RIGHT, right);
+    #endif
+    return (right_request_t) {
+        .result = static_cast<result_t>(result.result),
+        .right = result.value,
+    };
+}
+
+mem_request_ret_t map_mem_object(const map_mem_object_param_t *params)
+{
+#ifdef __32BITSYSCALL
+    syscall_r r = __pmos_syscall32_1words(SYSCALL_MAP_MEM_OBJECT, params);
+#else
+    syscall_r r = syscall1(SYSCALL_MAP_MEM_OBJECT, reinterpret_cast<uintptr_t>(params));
+#endif
+    mem_request_ret_t t = {
+        .result = static_cast<result_t>(r.result),
+        .virt_addr_intptr = r.value
+    };
+    return t;
+}
+
+result_t complete_interrupt(pmos_port_t port, pmos_right_t receive_right)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_4words(SYSCALL_COMPLETE_INTERRUPT, port, receive_right).result;
+#else
+    return syscall2(SYSCALL_COMPLETE_INTERRUPT, port, receive_right).result;
+#endif
+}
+
+interrupt_info_t get_interrupt_affinity(pmos_right_t right)
+{
+    syscall_r result;
+    #ifdef __32BITSYSCALL
+    result = __pmos_syscall32_2words(SYSCALL_GET_INTERRUPT_INFO, right);
+    #else
+    result = syscall1(SYSCALL_GET_INTERRUPT_INFO, right);
+    #endif
+    return (interrupt_info_t) {
+        .result = static_cast<result_t>(result.result),
+        .interrupt_affinity_cpu = static_cast<u32>(result.value & 0xffffffff),
+        .arch_vector = static_cast<u32>(result.value >> 32),
+    };
+}
+
+right_request_t set_interrupt(pmos_right_t right, pmos_port_t port)
+{
+    syscall_r r;
+#ifdef __32BITSYSCALL
+    r = __pmos_syscall32_4words(SYSCALL_SET_INTERRUPT, right, port);
+#else
+    r = syscall2(SYSCALL_SET_INTERRUPT, right, port);
+#endif
+    right_request_t ret = {
+        .result = static_cast<result_t>(r.result),
+        .right = r.value,
+    };
+    return ret;
+}
+
+mem_request_ret_t create_phys_map_region(uint64_t pid, void *addr_start, size_t size,
+                                         uint32_t access, uint64_t phys_addr)
+{
+#ifdef __32BITSYSCALL
+    syscall_r r = __pmos_syscall32_6words(SYSCALL_CREATE_PHYS_REGION | (access << 8), pid,
+                                          phys_addr, addr_start, size);
+#else
+    syscall_r r =
+        syscall4(SYSCALL_CREATE_PHYS_REGION | (access << 8), pid, reinterpret_cast<uintptr_t>(phys_addr), reinterpret_cast<uintptr_t>(addr_start), size);
+#endif
+    mem_request_ret_t t = {
+        .result = static_cast<result_t>(r.result),
+        .virt_addr_intptr = r.value
+    };
+    return t;
+}
+
+syscall_r pmos_get_time(unsigned mode)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_1words(SYSCALL_GET_TIME, mode);
+#else
+    return syscall1(SYSCALL_GET_TIME, mode);
+#endif
+}
+
+result_t send_message_port(uint64_t port, size_t size, const void *message)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_4words(SYSCALL_SEND_MSG_PORT, port, size, (unsigned)message).result;
+#else
+    return syscall3(SYSCALL_SEND_MSG_PORT, port, size, reinterpret_cast<uintptr_t>(message)).result;
+#endif
+}
+
+result_t delete_receive_right(pmos_port_t port, pmos_right_t right)
+{
+    if (!port || !right)
+        return SUCCESS;
+
+    #ifdef __i386__
+    return __pmos_syscall32_4words(SYSCALL_DELETE_RECEIVE_RIGHT, port, right).result;
+    #else
+    return syscall2(SYSCALL_DELETE_RECEIVE_RIGHT, port, right).result;
+    #endif
+}
+
+syscall_r __pmos_syscall_set_attr(uint64_t pid, uint32_t attr, unsigned long value)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_4words(SYSCALL_SET_ATTR, pid, attr, value);
+#else
+    return syscall3(SYSCALL_SET_ATTR, pid, attr, value);
+#endif
+}
 
 } // extern "C"
