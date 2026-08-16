@@ -18,5 +18,6 @@
 
 #define AT_MEM_OBJ_ID 40
 #define AT_TASK_GROUP_ID 41
+#define AT_LOAD_DATA 42
 
 #endif /* _ABIBITS_AUXV_H */

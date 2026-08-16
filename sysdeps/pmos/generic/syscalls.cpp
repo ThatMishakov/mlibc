@@ -310,4 +310,237 @@ syscall_r __pmos_syscall_set_attr(uint64_t pid, uint32_t attr, unsigned long val
 #endif
 }
 
+result_t set_right0(pmos_right_t right)
+{
+    syscall_r result;
+#ifdef __32BITSYSCALL
+    result = __pmos_syscall32_2words(SYSCALL_SET_RIGHT0, right);
+#else
+    result = syscall1(SYSCALL_SET_RIGHT0, right);
+#endif
+    return result.result;
+}
+
+right_request_t transfer_right(uint64_t task_group, uint64_t right, unsigned flags)
+{
+    syscall_r result;
+    #ifdef __32BITSYSCALL
+    result = __pmos_syscall32_4words(SYSCALL_TRANSFER_RIGHT | (flags << 8), task_group, right);
+    #else
+    result = syscall2(SYSCALL_TRANSFER_RIGHT | (flags << 8), task_group, right);
+    #endif
+    return (right_request_t) {
+        .result = static_cast<result_t>(result.result),
+        .right = result.value,
+    };
+}
+
+syscall_r get_mem_object_size(mem_object_t mem_object_id, unsigned flags)
+{
+    #ifdef __32BITSYSCALL
+    return __pmos_syscall32_2words(SYSCALL_GET_MEM_OBJECT_SIZE | (flags << 8), mem_object_id);
+    #else
+    return syscall1(SYSCALL_GET_MEM_OBJECT_SIZE | (flags << 8), mem_object_id);
+    #endif
+}
+
+page_table_req_ret_t assign_page_table(uint64_t pid, uint64_t page_table, unsigned flags, unsigned for_arch)
+{
+#ifdef __32BITSYSCALL
+    syscall_r r = __pmos_syscall32_4words(SYSCALL_ASSIGN_PAGE_TABLE | (flags << 8) | (for_arch << 24), pid, page_table);
+#else
+    syscall_r r = syscall2(SYSCALL_ASSIGN_PAGE_TABLE | (flags << 8) | (for_arch << 24), pid, page_table);
+#endif
+    return (page_table_req_ret_t) {
+        .result = static_cast<result_t>(r.result),
+        .page_table = r.value
+    };
+}
+
+result_t release_region(uint64_t tid, void *region)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_3words(SYSCALL_DELETE_REGION, tid, region).result;
+#else
+    return syscall2(SYSCALL_DELETE_REGION, tid, reinterpret_cast<uintptr_t>(region)).result;
+#endif
+}
+
+mem_request_ret_t transfer_region(uint64_t to_page_table, void *region, uint64_t dest, uint32_t flags)
+{
+#ifdef __32BITSYSCALL
+    syscall_r r = __pmos_syscall32_5words(SYSCALL_TRANSFER_REGION | (flags << 8), to_page_table, dest,
+                                          region);
+#else
+    syscall_r r = syscall3(SYSCALL_TRANSFER_REGION | (flags << 8), to_page_table, dest, reinterpret_cast<uintptr_t>(region));
+#endif
+    mem_request_ret_t t = {
+        .result = static_cast<result_t>(r.result),
+        .virt_addr_intptr = r.value
+    };
+    return t;
+}
+
+syscall_r init_stack(uint64_t tid, uint64_t stack_top)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_4words(SYSCALL_INIT_STACK, tid, stack_top);
+#else
+    return syscall2(SYSCALL_INIT_STACK, tid, stack_top);
+#endif
+}
+
+result_t syscall_start_process(uint64_t pid, unsigned long entry, unsigned long arg1,
+                               unsigned long arg2, unsigned long arg3)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_6words(SYSCALL_START_PROCESS, pid, entry, arg1, arg2, arg3).result;
+#else
+    return syscall5(SYSCALL_START_PROCESS, pid, entry, arg1, arg2, arg3).result;
+#endif
+}
+
+syscall_r syscall_new_process()
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_0words(SYSCALL_CREATE_PROCESS);
+#else
+    return syscall0(SYSCALL_CREATE_PROCESS);
+#endif
+}
+
+result_t syscall_set_task_name(uint64_t tid, const char *name, size_t name_length)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_4words(SYSCALL_SET_TASK_NAME, tid, (unsigned)name, name_length).result;
+#else
+    return syscall3(SYSCALL_SET_TASK_NAME, tid, reinterpret_cast<uintptr_t>(name), name_length).result;
+#endif
+}
+
+syscall_r create_task_group()
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_0words(SYSCALL_CREATE_TASK_GROUP);
+#else
+    return syscall0(SYSCALL_CREATE_TASK_GROUP);
+#endif
+}
+
+result_t add_task_to_group(uint64_t group, uint64_t task)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_4words(SYSCALL_ADD_TASK_TO_GROUP, group, task).result;
+#else
+    return syscall2(SYSCALL_ADD_TASK_TO_GROUP, group, task).result;
+#endif
+}
+
+result_t remove_task_from_group(uint64_t group, uint64_t task)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_4words(SYSCALL_REMOVE_TASK_FROM_GROUP, group, task).result;
+#else
+    return syscall2(SYSCALL_REMOVE_TASK_FROM_GROUP, group, task).result;
+#endif
+}
+
+result_t syscall_kill_task(uint64_t tid)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_2words(SYSCALL_KILL_TASK, tid).result;
+#else
+    return syscall1(SYSCALL_KILL_TASK, tid).result;
+#endif
+}
+
+phys_addr_request_t get_page_phys_address(uint64_t task_id, void *region, uint64_t flags)
+{
+#ifdef __32BITSYSCALL
+    syscall_r r =
+        __pmos_syscall32_4words(SYSCALL_GET_PAGE_ADDRESS, task_id, (unsigned)region, flags);
+#else
+    syscall_r r = syscall3(SYSCALL_GET_PAGE_ADDRESS, task_id, reinterpret_cast<uintptr_t>(region), flags);
+#endif
+    phys_addr_request_t t = {static_cast<result_t>(r.result), r.value};
+    return t;
+}
+
+phys_addr_request_t get_page_phys_address_from_object(mem_object_t object_id, uint64_t offset,
+                                                      unsigned flags)
+{
+#ifdef __32BITSYSCALL
+    syscall_r r = __pmos_syscall32_4words(SYSCALL_MEM_OBJECT_GET_PAGE_ADDRESS | (flags << 8),
+                                          object_id, offset);
+#else
+    syscall_r r =
+        syscall2(SYSCALL_MEM_OBJECT_GET_PAGE_ADDRESS | (flags << 8), object_id, offset);
+#endif
+    phys_addr_request_t t = {static_cast<result_t>(r.result), r.value};
+    return t;
+}
+
+right_request_t create_mem_object(uint64_t size, uint32_t flags)
+{
+#ifdef __32BITSYSCALL
+    syscall_r r = __pmos_syscall32_2words(SYSCALL_CREATE_MEM_OBJECT | (flags << 8), size);
+#else
+    syscall_r r = syscall1(SYSCALL_CREATE_MEM_OBJECT | (flags << 8), size);
+#endif
+    right_request_t t = {static_cast<result_t>(r.result), r.value};
+    return t;
+}
+
+right_request_t pmos_create_timer(pmos_port_t port)
+{
+    syscall_r result;
+    #ifdef __32BITSYSCALL
+    result = __pmos_syscall32_2words(SYSCALL_CREATE_TIMER, port);
+    #else
+    result = syscall1(SYSCALL_CREATE_TIMER, port);
+    #endif
+    return (right_request_t) {
+        .result = static_cast<result_t>(result.result),
+        .right = result.value,
+    };
+}
+
+result_t pmos_set_timer(pmos_port_t port, pmos_right_t timer_right, uint64_t deadline_ns, unsigned flags)
+{
+    #ifdef __32BITSYSCALL
+    return __pmos_syscall32_6words(SYSCALL_SET_TIMER_DEADLINE | (flags << 8), port, timer_right, deadline_ns).result;
+    #else
+    return syscall3(SYSCALL_SET_TIMER_DEADLINE | (flags << 8), port, timer_right, deadline_ns).result;
+    #endif
+}
+
+result_t set_log_port(pmos_port_t port, uint32_t flags)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_2words(SYSCALL_SET_LOG_PORT | (flags << 8), port).result;
+#else
+    return syscall1(SYSCALL_SET_LOG_PORT | (flags << 8), port).result;
+#endif
+}
+
+syscall_r set_task_group_notifier_mask(uint64_t task_group_id, pmos_port_t port_id,
+                                       uint32_t new_mask, uint32_t flags)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_5words(SYSCALL_SET_NOTIFY_MASK | (flags << 8), task_group_id, port_id,
+                                   new_mask);
+#else
+    return syscall3(SYSCALL_SET_NOTIFY_MASK | (flags << 8), task_group_id, port_id, new_mask);
+#endif
+}
+
+syscall_r get_right_type(pmos_right_t right)
+{
+    #ifdef __32BITSYSCALL
+    return __pmos_syscall32_2words(SYSCALL_GET_RIGHT_TYPE, right);
+    #else
+    return syscall1(SYSCALL_GET_RIGHT_TYPE, right);
+    #endif
+}
+
 } // extern "C"
