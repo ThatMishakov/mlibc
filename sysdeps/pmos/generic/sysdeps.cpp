@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <mlibc/debug.hpp>
+
 #define STUB()                                                                                     \
     ({                                                                                             \
         __ensure(!"STUB function was called");                                                     \
@@ -57,6 +59,7 @@ void Sysdeps<Yield>::operator()() {
 
 void Sysdeps<LibcLog>::operator()(const char *message) {
     pmos_kernel_debug_log(message, strlen(message));
+    pmos_kernel_debug_log("\n", 1);
 }
 
 void Sysdeps<LibcPanic>::operator()() {
