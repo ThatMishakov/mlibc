@@ -860,7 +860,7 @@ typedef struct IPC_FS_Property {
     uint32_t data_length; 
     /// Data (the size is property_length - sizeof(IPC_FS_Property))
     uint8_t data[];
-};
+} IPC_FS_Property;
 
 #define IPC_FS_Probe_Result_NUM 0xD7
 typedef struct IPC_FS_Probe_Result {
