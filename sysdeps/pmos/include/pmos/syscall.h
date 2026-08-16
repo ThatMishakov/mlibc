@@ -18,8 +18,8 @@ static inline syscall_r syscall0(uint64_t call_n_flags)
     syscall_r ret;
     asm volatile("syscall"
                  : "=a"(ret.result), "=d"(ret.value)
-                 : "D"(call_n_flags)
-                 : "memory");
+                 : "a"(call_n_flags)
+                 : "memory", "rcx", "r11");
     return ret;
 }
 
@@ -28,8 +28,8 @@ static inline syscall_r syscall1(uint64_t call_n_flags, uint64_t arg1)
     syscall_r ret;
     asm volatile("syscall"
                  : "=a"(ret.result), "=d"(ret.value)
-                 : "D"(call_n_flags), "S"(arg1)
-                 : "memory");
+                 : "a"(call_n_flags), "D"(arg1)
+                 : "memory", "rcx", "r11");
     return ret;
 }
 
@@ -38,8 +38,8 @@ static inline syscall_r syscall2(uint64_t call_n_flags, uint64_t arg1, uint64_t 
     syscall_r ret;
     asm volatile("syscall"
                  : "=a"(ret.result), "=d"(ret.value)
-                 : "D"(call_n_flags), "S"(arg1), "d"(arg2)
-                 : "memory");
+                 : "a"(call_n_flags), "D"(arg1), "S"(arg2)
+                 : "memory", "rcx", "r11");
     return ret;
 }
 
@@ -50,8 +50,8 @@ static inline syscall_r syscall3(uint64_t call_n_flags, uint64_t arg1, uint64_t 
     syscall_r ret;
     asm volatile("syscall"
                  : "=a"(ret.result), "=d"(ret.value)
-                 : "D"(call_n_flags), "S"(arg1), "d"(arg2), "r"(r10)
-                 : "memory");
+                 : "a"(call_n_flags), "D"(arg1), "S"(arg2), "r"(r10)
+                 : "memory", "rcx", "r11");
     return ret;
 }
 
@@ -62,8 +62,8 @@ static inline syscall_r syscall4(uint64_t call_n_flags, uint64_t arg1, uint64_t 
     syscall_r ret;
     asm volatile("syscall"
                  : "=a"(ret.result), "=d"(ret.value)
-                 : "D"(call_n_flags), "S"(arg1), "d"(arg2), "r"(r10), "r"(r8)
-                 : "memory");
+                 : "a"(call_n_flags), "D"(arg1), "S"(arg2), "r"(r10), "r"(r8)
+                 : "memory", "rcx", "r11");
     return ret;
 }
 
@@ -74,8 +74,8 @@ static inline syscall_r syscall5(uint64_t call_n_flags, uint64_t arg1, uint64_t 
     syscall_r ret;
     asm volatile("syscall"
                  : "=a"(ret.result), "=d"(ret.value)
-                 : "D"(call_n_flags), "S"(arg1), "d"(arg2), "r"(r10), "r"(r8), "r"(r9)
-                 : "memory");
+                 : "a"(call_n_flags), "D"(arg1), "S"(arg2), "r"(r10), "r"(r8), "r"(r9)
+                 : "memory", "rcx", "r11");
     return ret;
 }
 
