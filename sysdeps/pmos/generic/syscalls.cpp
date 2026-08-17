@@ -543,4 +543,13 @@ syscall_r get_right_type(pmos_right_t right)
     #endif
 }
 
+syscall_r set_namespace(uint64_t new_id, unsigned type)
+{
+#ifdef __32BITSYSCALL
+    return __pmos_syscall32_3words(SYSCALL_SET_NAMESPACE, new_id, type);
+#else
+    return syscall2(SYSCALL_SET_NAMESPACE, new_id, type);
+#endif
+}
+
 } // extern "C"
