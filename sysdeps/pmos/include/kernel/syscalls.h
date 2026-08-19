@@ -102,5 +102,8 @@
 #define SYSCALL_CREATE_TIMER                61
 #define SYSCALL_SET_TIMER_DEADLINE          62
 #define SYSCALL_DEBUG_LOG                   63
+#define SYSCALL_FUTEX_WAIT                  64
+#define SYSCALL_FUTEX_WAKE                  65
+#define SYSCALL_SLEEP                       66
 
 #endif

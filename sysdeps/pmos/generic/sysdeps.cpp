@@ -3,6 +3,7 @@
 #include <pmos/system.h>
 #include <pmos/memory.h>
 #include <pmos/syscall.h>
+#include "common.hpp"
 
 #include <stdlib.h>
 #include <string.h>
@@ -14,14 +15,6 @@
         __ensure(!"STUB function was called");                                                     \
         __builtin_unreachable();                                                                   \
 })
-
-namespace {
-
-int kernel_to_errno(result_t result) {
-    return -(int)result;
-}
-
-}
 
 namespace mlibc {
 
@@ -48,8 +41,8 @@ int Sysdeps<AnonFree>::operator()(void *ptr, size_t size) {
     return Sysdeps<VmUnmap>()(ptr, size);
 }
 
-void Sysdeps<Exit>::operator()(int status) {
-    syscall1(SYSCALL_EXIT, (uint64_t)status);
+[[noreturn]] void Sysdeps<Exit>::operator()(int status) {
+    syscall2(SYSCALL_EXIT, (uint64_t)status, true);
     __builtin_unreachable();
 }
 
@@ -69,52 +62,20 @@ void Sysdeps<LibcPanic>::operator()() {
 }
 
 
-int Sysdeps<Close>::operator()(int) {
-    STUB();
-}
-
-int Sysdeps<Write>::operator()(int , const void *, size_t , ssize_t *) {
-    STUB();
-}
-
-int Sysdeps<Read>::operator()(int , void *, size_t , ssize_t *) {
-    STUB();
-}
-
-int Sysdeps<Seek>::operator()(int , off_t , int , off_t *) {
-    STUB();
-}
-
-int Sysdeps<Open>::operator()(const char *, int, mode_t, int *) {
-    STUB();
-}
-
-int Sysdeps<Isatty>::operator()(int) {
-    STUB();
-}
-
-int Sysdeps<Recvfrom>::operator()(int , void *, size_t , int , struct sockaddr *, socklen_t *, ssize_t *) {
-    STUB();
-}
-
-int Sysdeps<Dup2>::operator()(int , int , int) {
-    STUB();
-}
 
 int Sysdeps<ClockGet>::operator()(int , time_t *, long *) {
     STUB();
 }
 
-int Sysdeps<VmMap>::operator()(void *, size_t , int , int , int , off_t , void **) {
-    STUB();
+int Sysdeps<FutexWake>::operator()(int *pointer, bool all) {
+    auto result = pmos_futex_wake(pointer, all);
+    return kernel_to_errno(result);
 }
 
-int Sysdeps<FutexWake>::operator()(int *, bool) {
-    STUB();
-}
-
-int Sysdeps<FutexWait>::operator()(int *, int, const struct timespec *) {
-    STUB();
+int Sysdeps<FutexWait>::operator()(int *pointer, int expected, const struct timespec *timeout) {
+    uint64_t timeout_ns = timeout ? timespec_to_kernel(timeout) : -1;
+    auto result = pmos_futex_wait(pointer, expected, timeout_ns);
+    return kernel_to_errno(result);
 }
 
 }

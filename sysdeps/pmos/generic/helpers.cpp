@@ -55,14 +55,16 @@ namespace {
 
 thread_local pmos_port_t reply_port = INVALID_PORT;
 
-pmos_port_t prepare_reply_port()
+} // namespace
+
+pmos_port_t __pmos_prepare_reply_port()
 {
     if (reply_port != INVALID_PORT)
         return reply_port;
 
     ports_request_t port_request = create_port(TASK_ID_SELF, 0);
     if (port_request.result != SUCCESS) {
-        mlibc::infoLogger() << "mlibc: prepare_reply_port() failed to create port: " << strerror(-port_request.result) << frg::endlog;
+        mlibc::infoLogger() << "mlibc: __pmos_prepare_reply_port() failed to create port: " << strerror(-port_request.result) << frg::endlog;
         errno = EIO;
     } else
         reply_port = port_request.port;
@@ -70,11 +72,9 @@ pmos_port_t prepare_reply_port()
     return reply_port;
 }
 
-} // namespace
-
 right_request_t get_right_by_name(const char *name, size_t length, uint32_t flags)
 {
-    pmos_port_t reply_port = prepare_reply_port();
+    pmos_port_t reply_port = __pmos_prepare_reply_port();
     if (reply_port == INVALID_PORT) {
         return (right_request_t) {
             .result = static_cast<result_t>(-ENOMEM),
@@ -135,7 +135,7 @@ result_t name_right(pmos_right_t right, const char *name, size_t length, uint32_
     IPC_Name_Right_Reply *reply = NULL;
     result_t k_result;
 
-    pmos_port_t reply_port = prepare_reply_port();
+    pmos_port_t reply_port = __pmos_prepare_reply_port();
     if (reply_port == INVALID_PORT) {
         return -ENOMEM;
     }

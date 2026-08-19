@@ -24,7 +24,11 @@ struct PmosSysdepTags :
 	ClockGet,
 	Recvfrom,
 	Dup2,
-	Yield
+	Yield,
+	Sleep,
+	PrepareStack,
+	Clone,
+	ThreadExit
 {};
 
 template<typename Tag>
