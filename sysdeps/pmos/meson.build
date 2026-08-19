@@ -99,6 +99,7 @@ endif
 rtld_sources += files(
 	'generic/sysdeps.cpp',
 	'generic/syscalls.cpp',
+	'generic/filesystem.cpp',
 )
 rtld_include_dirs += include_directories('include')
 
@@ -107,6 +108,10 @@ libc_sources += files(
 	'generic/sysdeps.cpp',
 	'generic/syscalls.cpp',
 	'generic/helpers.cpp',
+	'generic/filesystem.cpp',
+	'generic/thread.cpp',
+	
+	host_machine.cpu_family() + '/thread.S',
 )
 libc_include_dirs += include_directories('include')
 

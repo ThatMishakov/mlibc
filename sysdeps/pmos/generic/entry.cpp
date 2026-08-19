@@ -5,6 +5,7 @@
 #include <mlibc/debug.hpp>
 #include <pmos/system.h>
 #include <bits/ensure.h>
+#include "common.hpp"
 
 extern "C" void __dlapi_enter(uintptr_t *);
 

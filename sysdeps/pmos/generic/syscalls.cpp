@@ -552,4 +552,19 @@ syscall_r set_namespace(uint64_t new_id, unsigned type)
 #endif
 }
 
+syscall_r pmos_sleep(uint64_t nanoseconds)
+{
+    return syscall1(SYSCALL_SLEEP, nanoseconds);
+}
+
+result_t pmos_futex_wait(int *pointer, int expected, uint64_t timeout_ns)
+{
+    return syscall3(SYSCALL_FUTEX_WAIT, timeout_ns, reinterpret_cast<uintptr_t>(pointer), expected).result;
+}
+
+result_t pmos_futex_wake(int *pointer, bool all)
+{
+    return syscall2(SYSCALL_FUTEX_WAKE, reinterpret_cast<uintptr_t>(pointer), all).result;
+}
+
 } // extern "C"

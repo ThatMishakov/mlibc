@@ -896,12 +896,6 @@ typedef struct IPC_Pipe_Open {
 
     /// Flags changing the behaviour
     uint32_t flags;
-
-    /// Port where the reply will be sent
-    pmos_port_t reply_port;
-
-    /// ID of the file system consumer
-    uint64_t fs_consumer_id;
 } IPC_Pipe_Open;
 
 #define IPC_Pipe_Open_Reply_NUM 0xE1
@@ -915,17 +909,7 @@ typedef struct IPC_Pipe_Open_Reply {
     /// Result code indicating the outcome of the open operation
     int16_t result_code;
 
-    /// ID of the file system
-    uint64_t filesystem_id;
-
-    /// ID of the reader end of the pipe
-    uint64_t reader_id;
-
-    /// ID of the writer end of the pipe
-    uint64_t writer_id;
-
-    /// Port associated with the pipe
-    pmos_port_t pipe_port;
+    // On success, right 0 is read right, right 1 is write right
 } IPC_Pipe_Open_Reply;
 
 #define IPC_Disk_Register_NUM 0xF0
@@ -1424,6 +1408,18 @@ typedef struct IPC_Preregister_Process_Reply {
     /// Result code (if negative) or PID (if positive)
     int64_t result;
 } IPC_Preregister_Process_Reply;
+
+#define IPC_Request_Right_Reply_NUM 0x18d
+typedef struct IPC_Request_Right_Reply {
+    /// Message type (must be IPC_Get_Right_Reply_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+
+    /// Result (-errno)
+    int64_t result;
+} IPC_Request_Right_Reply;
 
 struct IPC_Object_Property {
     // Also aligned to 8 I guess...

@@ -379,6 +379,14 @@ result_t pmos_yield();
  */
 syscall_r pmos_get_time(unsigned mode);
 
+/**
+ * @brief Suspend the calling thread for the specified time in nanoseconds, return remaining time if interrupted.
+ * 
+ * @param nanoseconds Time in nanoseconds to sleep for
+ * @return syscall_r result of the operation. If interrupted, the remaining time (or logically, 0 if successful).
+ */
+syscall_r pmos_sleep(uint64_t nanoseconds);
+
 right_request_t request_named_port(const char *name, size_t name_length, pmos_port_t reply_port,
                             uint32_t flags);
 
@@ -529,6 +537,20 @@ result_t pmos_set_timer(pmos_port_t port, pmos_right_t timer_right, uint64_t dea
 /// @param length Length of the string
 /// @return Result of the operation
 result_t pmos_kernel_debug_log(const char *string, size_t length);
+
+/// @brief Compares the value in the memory with the expected value, and if they are equal, waits
+/// for the futex to be woken up, or the optional timeout to expire.
+/// @param pointer Pointer to the futex value
+/// @param expected Expected value of the futex. If the value at pointer is not equal to this, the function returns immediately.
+/// @param timeout Optional timeout. If -1, waits indefinitely
+/// @return Result of the operation
+result_t pmos_futex_wait(int *pointer, int expected, uint64_t timeout_ns);
+
+/// @brief Wakes up the futex, waking up one or all waiting threads
+/// @param pointer Pointer to the futex value
+/// @param all If true, wakes up all waiting threads. If false, wakes up one
+/// @return Result of the operation
+result_t pmos_futex_wake(int *pointer, bool all);
 
 #define PMOS_SET_TIMER_RELATIVE (1 << 0)
 
