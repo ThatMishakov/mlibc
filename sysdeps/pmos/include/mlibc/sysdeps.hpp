@@ -38,4 +38,10 @@ struct SysdepTraits {
 	static constexpr bool usesRtNetlink = false;
 };
 
+struct PmosTcbData {
+	uint64_t threadPort;
+};
+
+using SysdepTcbData = PmosTcbData;
+
 } // namespace mlibc

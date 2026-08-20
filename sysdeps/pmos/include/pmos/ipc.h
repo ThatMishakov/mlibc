@@ -341,6 +341,21 @@ typedef struct IPC_Read {
     uint64_t max_size;
 } IPC_Read;
 
+#define IPC_Seek_NUM 0x43
+typedef struct IPC_Seek {
+    /// Message type (must be IPC_Seek_NUM)
+    uint32_t type;
+
+    /// Flags changing the behaviour
+    uint16_t flags;
+
+    /// Whence to seek from
+    uint16_t whence;
+
+    /// Offset to seek to
+    uint64_t offset;
+} IPC_Seek;
+
 #define IPC_Read_Reply_NUM 0x50
 typedef struct IPC_Read_Reply {
     /// Message type (must be IPC_Read_Reply_NUM)
@@ -367,6 +382,18 @@ typedef struct IPC_Write_Reply {
 
     uint64_t bytes_written;
 } IPC_Write_Reply;
+
+#define IPC_Seek_Reply_NUM 0x52
+typedef struct IPC_Seek_Reply {
+    /// Message type (must be IPC_Seek_Reply_NUM)
+    uint32_t type;
+
+    uint16_t flags;
+
+    int16_t result_code;
+
+    uint64_t new_offset;
+} IPC_Seek_Reply;
 
 #define IPC_Stat_NUM 0x56
 /// Message sent by the user process to VFS daemon get file stats
