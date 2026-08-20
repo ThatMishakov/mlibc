@@ -79,6 +79,7 @@ if not no_headers
         'include/pmos/special.h',
         'include/pmos/system.h',
 		'include/pmos/special.h',
+		'include/pmos/fs-data.h',
         subdir: 'pmos',
         follow_symlinks: true
     )
@@ -110,7 +111,7 @@ libc_sources += files(
 	'generic/helpers.cpp',
 	'generic/filesystem.cpp',
 	'generic/thread.cpp',
-	
+
 	host_machine.cpu_family() + '/thread.S',
 )
 libc_include_dirs += include_directories('include')

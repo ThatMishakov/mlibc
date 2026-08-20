@@ -6,6 +6,10 @@
 
 #include <pmos/system.h>
 #include <mlibc/threads.hpp>
+#include <pmos/fs-data.h>
+
+#include <sys/auxv.h>
+#include <sys/mman.h>
 
 #define STUB()                                                                                     \
     ({                                                                                             \
@@ -108,4 +112,19 @@ int Sysdeps<Sleep>::operator()(time_t *secs, long *nanos)
     return -result.result;
 }
 
+}
+
+void __pmos_fill_fd_table(void *fs_data_ptr)
+{
+    auto fs_data = (struct FsData *)fs_data_ptr;
+    auto count = fs_data->array_size;
+    __ensure(count <= __MLIBC_OPEN_MAX);
+    for (unsigned i = 0; i < count; ++i) {
+        auto &file = fs_data->open_files[i];
+        open_files[i].io_right = file.io_right;
+        open_files[i].op_right = file.op_right;
+        open_files[i].flags    = file.flags;
+    }
+
+    mlibc::Sysdeps<AnonFree>()(reinterpret_cast<void *>(fs_data), fs_data->total_size);
 }
