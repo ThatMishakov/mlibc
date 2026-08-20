@@ -5,6 +5,8 @@
 
 extern uint64_t __process_task_group;
 
+void __pmos_fill_fd_table(void *data_ptr);
+
 namespace {
 
 int kernel_to_errno(result_t result) {
