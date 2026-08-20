@@ -34,6 +34,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifndef SUCCESS
     #define SUCCESS 0
