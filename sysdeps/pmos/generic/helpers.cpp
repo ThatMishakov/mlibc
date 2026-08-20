@@ -7,6 +7,7 @@
 #include <string.h>
 #include <mlibc/debug.hpp>
 #include <kernel/attributes.h>
+#include "common.hpp"
 
 result_t get_message(Message_Descriptor *desc, unsigned char **message, pmos_port_t port,
                      pmos_right_t *reply_right, pmos_right_t *other_rights)
@@ -48,28 +49,6 @@ right_request_t request_named_port(const char *name, size_t length, pmos_port_t 
     memcpy(n->name, name, length);
 
     return send_message_right(0, reply_port, n, size, 0, 0);
-}
-
-// TODO: This is dumb and also doesn't work with signals and needs to be moved to a separate library...
-namespace {
-
-thread_local pmos_port_t reply_port = INVALID_PORT;
-
-} // namespace
-
-pmos_port_t __pmos_prepare_reply_port()
-{
-    if (reply_port != INVALID_PORT)
-        return reply_port;
-
-    ports_request_t port_request = create_port(TASK_ID_SELF, 0);
-    if (port_request.result != SUCCESS) {
-        mlibc::infoLogger() << "mlibc: __pmos_prepare_reply_port() failed to create port: " << strerror(-port_request.result) << frg::endlog;
-        errno = EIO;
-    } else
-        reply_port = port_request.port;
-
-    return reply_port;
 }
 
 right_request_t get_right_by_name(const char *name, size_t length, uint32_t flags)

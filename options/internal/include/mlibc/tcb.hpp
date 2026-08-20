@@ -7,6 +7,8 @@
 #include <frg/list.hpp>
 #include <mlibc/threads.hpp>
 
+#include <mlibc/sysdeps.hpp>
+
 #include "elf.hpp"
 
 /*
@@ -152,6 +154,8 @@ struct Tcb {
 	};
 
 	CxaThreadExitHandler *cxaThreadExitHandlers;
+	
+	mlibc::SysdepTcbData sysdepData;
 
 	inline void invokeThreadFunc(void *entry, void *user_arg) {
 		if(returnValueType == TcbThreadReturnValue::Pointer) {
