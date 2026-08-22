@@ -14,6 +14,7 @@
 
 #include <sys/auxv.h>
 #include <sys/mman.h>
+#include <alloca.h>
 
 #include "common.hpp"
 
@@ -61,6 +62,17 @@ struct OpenFile {
 constinit FutexLock filesystem_mutex;
 // Don't bother freeing this, notably this is needed for ld.so
 constinit frg::array<OpenFile, __MLIBC_OPEN_MAX> open_files{};
+
+
+unsigned flags_to_io(unsigned fd_flags) {
+    unsigned io_flags = 0;
+    if (fd_flags & O_APPEND)
+        io_flags |= IPC_FLAG_IO_OP_APPEND;
+    if (fd_flags & O_NONBLOCK)
+        io_flags |= IPC_FLAG_IO_OP_NONBLOCK;
+    return io_flags;
+}
+
 } // namespace
 
 
@@ -70,8 +82,50 @@ int Sysdeps<Close>::operator()(int) {
     STUB();
 }
 
-int Sysdeps<Write>::operator()(int , const void *, size_t , ssize_t *) {
-    STUB();
+int Sysdeps<Write>::operator()(int fd, const void *buff, size_t count, ssize_t *bytes_written) {
+    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+        return EBADF;
+
+    pmos_right_t io_right;
+    {
+        frg::unique_lock lock(filesystem_mutex);
+        io_right = open_files[fd].io_right;
+    }
+
+    if (io_right == INVALID_RIGHT)
+        return EBADF;
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    IPC_Write *write_msg = (IPC_Write *)alloca(sizeof(IPC_Write) + count);
+    write_msg->type = IPC_Write_NUM;
+    write_msg->flags = flags_to_io(open_files[fd].flags) | IPC_FLAG_IO_OP_SEEK;
+    write_msg->offset = 0;
+    memcpy(write_msg->data, buff, count);
+
+    auto send_result = send_message_right(io_right, port, write_msg, sizeof(IPC_Write) + count, nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    // TODO: Handle EINTR
+    __ensure(result == SUCCESS);
+
+    IPC_Write_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Write_Reply_NUM)
+        return EIO;
+
+    *bytes_written = static_cast<ssize_t>(reply.bytes_written);
+    return -reply.result_code;
 }
 
 int Sysdeps<Read>::operator()(int , void *, size_t , ssize_t *) {
