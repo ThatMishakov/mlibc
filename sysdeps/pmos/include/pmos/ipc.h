@@ -318,6 +318,8 @@ typedef struct IPC_Write {
     uint32_t flags;
 
 #define IPC_FLAG_IO_OP_SEEK 0x01
+#define IPC_FLAG_IO_OP_APPEND 0x02
+#define IPC_FLAG_IO_OP_NONBLOCK 0x04
 
     /// Offset where the data should be written
     uint64_t offset;
