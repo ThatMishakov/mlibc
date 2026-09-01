@@ -101,7 +101,7 @@ int Sysdeps<Write>::operator()(int fd, const void *buff, size_t count, ssize_t *
 
     IPC_Write *write_msg = (IPC_Write *)alloca(sizeof(IPC_Write) + count);
     write_msg->type = IPC_Write_NUM;
-    write_msg->flags = flags_to_io(open_files[fd].flags) | IPC_FLAG_IO_OP_SEEK;
+    write_msg->flags = flags_to_io(open_files[fd].flags);
     write_msg->offset = 0;
     memcpy(write_msg->data, buff, count);
 
