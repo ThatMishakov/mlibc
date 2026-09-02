@@ -91,6 +91,10 @@ enum class TcbThreadReturnValue {
 };
 
 struct Tcb {
+	#if !defined(__x86_64__) && !defined(__i386__)
+	mlibc::SysdepTcbData sysdepData;
+	#endif
+
 	Tcb *selfPointer;
 	size_t dtvSize;
 	void **dtvPointers;
@@ -155,7 +159,9 @@ struct Tcb {
 
 	CxaThreadExitHandler *cxaThreadExitHandlers;
 	
+	#if defined(__x86_64__) || defined(__i386__)
 	mlibc::SysdepTcbData sysdepData;
+	#endif
 
 	inline void invokeThreadFunc(void *entry, void *user_arg) {
 		if(returnValueType == TcbThreadReturnValue::Pointer) {
