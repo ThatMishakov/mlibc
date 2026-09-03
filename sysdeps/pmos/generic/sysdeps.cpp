@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include <mlibc/debug.hpp>
+#include <mlibc/tcb.hpp>
 
 #define STUB()                                                                                     \
     ({                                                                                             \
@@ -19,7 +20,13 @@
 namespace mlibc {
 
 int Sysdeps<TcbSet>::operator()(void *ptr) {
-    auto result = pmos_set_registers(TASK_ID_SELF, SEGMENT_TCB, ptr);
+    #if defined(__x86_64__) || defined(__i386__)
+    auto tcb_ptr = ptr;
+    #else
+    auto tcb_ptr = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(ptr) + sizeof(Tcb));
+    #endif
+
+    auto result = pmos_set_registers(TASK_ID_SELF, SEGMENT_TCB, tcb_ptr);
     return kernel_to_errno(result);
 }
 
