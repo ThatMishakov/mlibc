@@ -91,11 +91,12 @@ enum class TcbThreadReturnValue {
 };
 
 struct Tcb {
+	Tcb *selfPointer;
+
 	#if !defined(__x86_64__) && !defined(__i386__)
 	mlibc::SysdepTcbData sysdepData;
 	#endif
 
-	Tcb *selfPointer;
 	size_t dtvSize;
 	void **dtvPointers;
 	int tid;
