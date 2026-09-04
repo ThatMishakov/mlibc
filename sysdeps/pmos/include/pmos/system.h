@@ -553,6 +553,8 @@ result_t pmos_futex_wait(int *pointer, int expected, uint64_t timeout_ns);
 /// @return Result of the operation
 result_t pmos_futex_wake(int *pointer, bool all);
 
+void pmos_syscall_exit(unsigned reason, bool terminate_process);
+
 #define PMOS_SET_TIMER_RELATIVE (1 << 0)
 
 #endif
