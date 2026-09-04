@@ -49,12 +49,12 @@ int Sysdeps<AnonFree>::operator()(void *ptr, size_t size) {
 }
 
 [[noreturn]] void Sysdeps<Exit>::operator()(int status) {
-    syscall2(SYSCALL_EXIT, (uint64_t)status, true);
+    pmos_syscall_exit((unsigned)status, true);
     __builtin_unreachable();
 }
 
 void Sysdeps<Yield>::operator()() {
-    syscall0(SYSCALL_YIELD);
+    pmos_yield();
 }
 
 void Sysdeps<LibcLog>::operator()(const char *message) {

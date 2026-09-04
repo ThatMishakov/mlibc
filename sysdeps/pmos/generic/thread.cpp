@@ -87,7 +87,7 @@ int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
 }
 
 [[noreturn]] void Sysdeps<ThreadExit>::operator()() {
-    syscall2(SYSCALL_EXIT, 0, false);
+    pmos_syscall_exit(0, false);
     __builtin_unreachable();
 }
 

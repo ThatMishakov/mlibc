@@ -102,6 +102,9 @@ rtld_sources += files(
 	'generic/syscalls.cpp',
 	'generic/filesystem.cpp',
 )
+if host_machine.cpu_family() == 'x86'
+	rtld_sources += files('x86/syscalls_asm.S')
+endif
 rtld_include_dirs += include_directories('include')
 
 libc_sources += files(
@@ -114,6 +117,9 @@ libc_sources += files(
 
 	host_machine.cpu_family() + '/thread.S',
 )
+if host_machine.cpu_family() == 'x86'
+	libc_sources += files('x86/syscalls_asm.S')
+endif
 libc_include_dirs += include_directories('include')
 
 if not headers_only

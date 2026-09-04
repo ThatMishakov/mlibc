@@ -85,7 +85,7 @@ static inline syscall_r syscall0(uint64_t call_n_flags)
 {
     register uintptr_t a0 asm("a0") = call_n_flags, a1 asm("a1");
     asm volatile("ecall\n\t"
-                 : "+r"(a0), "+r"(a1)
+                 : "+r"(a0), "=r"(a1)
                  : "r"(a0)
                  : "memory");
     syscall_r ret;
@@ -167,7 +167,7 @@ static inline syscall_r syscall0(uint64_t call_n_flags)
 {
     register uintptr_t a0 asm("a0") = call_n_flags, a1 asm("a1");
     asm volatile("syscall 0\n\t"
-                 : "+r"(a0), "+r"(a1)
+                 : "+r"(a0), "=r"(a1)
                  : "r"(a0)
                  : "memory");
     syscall_r ret;
@@ -244,6 +244,21 @@ static inline syscall_r syscall5(uint64_t call_n_flags, uint64_t arg1, uint64_t 
     return ret;
 }
 
+#elif defined(__i386__)
+
+extern "C" {
+
+syscall_r syscall32_0(uint32_t call_n_flags);
+syscall_r syscall32_1(uint32_t call_n_flags, uint32_t arg1);
+syscall_r syscall32_2(uint32_t call_n_flags, uint32_t arg1, uint32_t arg2);
+syscall_r syscall32_3(uint32_t call_n_flags, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+syscall_r syscall32_4(uint32_t call_n_flags, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4);
+syscall_r syscall32_5(uint32_t call_n_flags, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5);
+syscall_r syscall32_6(uint32_t call_n_flags, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5, uint32_t arg6);
+syscall_r syscall32_7(uint32_t call_n_flags, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7);
+syscall_r syscall32_8(uint32_t call_n_flags, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7, uint32_t arg8);
+
+}
 #else
 #error "Unsupported architecture"
 #endif
