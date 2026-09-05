@@ -24,6 +24,10 @@
         __builtin_unreachable();                                                                   \
 })
 
+uint64_t __process_task_group;
+pmos_right_t __posix_server_right = INVALID_RIGHT;
+extern uintptr_t *entryStack;
+
 namespace {
 
 struct RightWrapper {
@@ -71,6 +75,63 @@ unsigned flags_to_io(unsigned fd_flags) {
     if (fd_flags & O_NONBLOCK)
         io_flags |= IPC_FLAG_IO_OP_NONBLOCK;
     return io_flags;
+}
+
+void init_namespace() {
+    unsigned long value;
+    int result = peekauxval(AT_TASK_GROUP_ID, &value);
+    if (result < 0) {
+        auto result = create_task_group();
+        if (result.result != SUCCESS)
+            __ensure(!"Failed to create task group during mlibc init");
+
+        __process_task_group = result.value;
+    } else {
+        __process_task_group = *(uint64_t *)value;
+    }
+
+    auto set_result = set_namespace(__process_task_group, NAMESPACE_RIGHTS);
+    if (set_result.result != SUCCESS)
+        __ensure(!"Failed to set task group namespace during mlibc init");
+}
+
+void init_posix_right() {
+    unsigned long value;
+    int result = peekauxval(AT_POSIX_RIGHT, &value);
+    if (result < 0) {
+        __posix_server_right = INVALID_RIGHT;
+    } else {
+        __posix_server_right = *(uint64_t *)value;
+    }
+}
+
+void fill_fd_table(void *fs_data_ptr) {
+    auto fs_data = (struct PmosFsData *)fs_data_ptr;
+    auto count = fs_data->array_size;
+    __ensure(count <= __MLIBC_OPEN_MAX);
+    for (unsigned i = 0; i < count; ++i) {
+        auto &file = fs_data->open_files[i];
+
+        open_files[i].io_right = file.io_right;
+        open_files[i].op_right = file.op_right;
+        open_files[i].flags    = file.flags;
+    }
+
+    mlibc::Sysdeps<AnonFree>()(reinterpret_cast<void *>(fs_data), fs_data->total_size);
+}
+
+void init_fs() {
+    unsigned long value;
+    int auxv_result = peekauxval(AT_FD_TABLE, &value);
+    if (!auxv_result) {
+        fill_fd_table((void *)value);
+    }
+}
+
+__attribute__((constructor(49))) void init_sysdeps() {    
+    init_namespace();
+    init_posix_right();
+    init_fs();
 }
 
 } // namespace
@@ -183,8 +244,69 @@ int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offse
     return -reply.result_code;
 }
 
-int Sysdeps<Open>::operator()(const char *, int, mode_t, int *) {
-    STUB();
+int Sysdeps<Open>::operator()(const char *pathname, int flags, mode_t mode, int *fd) {
+    size_t path_len = strlen(pathname);
+    if (path_len > PATH_MAX)
+        return ENAMETOOLONG;
+
+    size_t message_size = sizeof(IPC_Open) + path_len;
+    IPC_Open *message = (IPC_Open *)alloca(message_size);
+    message->type = IPC_Open_NUM;
+    message->flags = flags | mode;
+    memcpy(message->path, pathname, path_len);
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto send_result = send_message_right(__posix_server_right, port, message, message_size, nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    pmos_right_t extra_rights[4] = {};
+    auto get_result = accept_rights(port, extra_rights);
+    __ensure(get_result == SUCCESS);
+    frg::scope_exit delete_rights([&] {
+        for (size_t i = 0; i < 4; ++i) {
+            if (extra_rights[i] != INVALID_RIGHT) {
+                delete_right(extra_rights[i]);
+            }
+        }
+    });
+
+    IPC_Open_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Open_Reply_NUM)
+        return EIO;
+
+    if (reply.result_code < 0)
+        return -reply.result_code;
+
+    frg::unique_lock lock(filesystem_mutex);
+    for (unsigned i = 0; i < __MLIBC_OPEN_MAX; ++i) {
+        if (open_files[i].io_right == INVALID_RIGHT) {
+            open_files[i].io_right = extra_rights[0];
+            open_files[i].op_right = extra_rights[1];
+            open_files[i].flags    = flags;
+            *fd = i;
+
+            extra_rights[0] = INVALID_RIGHT;
+            extra_rights[1] = INVALID_RIGHT;
+
+            return 0;
+        }
+    }
+
+    return EMFILE;
 }
 
 int Sysdeps<Isatty>::operator()(int fd) {
@@ -231,22 +353,6 @@ int Sysdeps<Sleep>::operator()(time_t *secs, long *nanos)
     return -result.result;
 }
 
-}
-
-void __pmos_fill_fd_table(void *fs_data_ptr)
-{
-    auto fs_data = (struct PmosFsData *)fs_data_ptr;
-    auto count = fs_data->array_size;
-    __ensure(count <= __MLIBC_OPEN_MAX);
-    for (unsigned i = 0; i < count; ++i) {
-        auto &file = fs_data->open_files[i];
-
-        open_files[i].io_right = file.io_right;
-        open_files[i].op_right = file.op_right;
-        open_files[i].flags    = file.flags;
-    }
-
-    mlibc::Sysdeps<AnonFree>()(reinterpret_cast<void *>(fs_data), fs_data->total_size);
 }
 
 pmos_port_t __pmos_prepare_reply_port()

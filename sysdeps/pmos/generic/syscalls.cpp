@@ -14,13 +14,18 @@
 
 extern "C" {
 
-result_t release_memory_range(uint64_t task_id, void *start, size_t size)
+result_t release_memory_range64(uint64_t task_id, uint64_t start, uint64_t size)
 {
 #ifdef __32BITSYSCALL
-    return syscall32_4(SYSCALL_UNMAP_RANGE, (uint32_t)task_id, task_id >> 32, (unsigned)start, size).result;
+    return syscall32_6(SYSCALL_UNMAP_RANGE, (uint32_t)task_id, task_id >> 32, (unsigned)start, start >> 32, (unsigned)size, size >> 32).result;
 #else
     return syscall3(SYSCALL_UNMAP_RANGE, (uint64_t)task_id, (uint64_t)start, (uint64_t)size).result;
 #endif
+}
+
+result_t release_memory_range(uint64_t task_id, void *start, size_t size)
+{
+    return release_memory_range64(task_id, (uint64_t)start, (uint64_t)size);
 }
 
 result_t pmos_set_registers(uint64_t pid, unsigned segment, void *addr)
@@ -32,18 +37,23 @@ result_t pmos_set_registers(uint64_t pid, unsigned segment, void *addr)
 #endif
 }
 
-mem_request_ret_t create_normal_region(uint64_t pid, void *addr_start, size_t size, uint32_t access)
+mem_request_ret_t create_normal_region64(uint64_t pid, uint64_t addr_start, uint64_t size, uint32_t access)
 {
-#ifdef __32BITSYSCALL
-    syscall_r r = syscall32_4(SYSCALL_CREATE_NORMAL_REGION | (access << 8), (uint32_t)pid, pid >> 32, (unsigned)addr_start, size);
-#else
-    syscall_r r = syscall3(SYSCALL_CREATE_NORMAL_REGION | (access << 8), (uint64_t)pid, (uint64_t)addr_start, (uint64_t)size);
-#endif
+    #ifdef __32BITSYSCALL
+        syscall_r r = syscall32_6(SYSCALL_CREATE_NORMAL_REGION | (access << 8), (uint32_t)pid, pid >> 32, (uint32_t)addr_start, addr_start >> 32, (uint32_t)size, size >> 32);
+    #else
+        syscall_r r = syscall3(SYSCALL_CREATE_NORMAL_REGION | (access << 8), (uint64_t)pid, (uint64_t)addr_start, (uint64_t)size);
+    #endif
     mem_request_ret_t t = {
         .result = static_cast<result_t>(r.result),
         .virt_addr_intptr = r.value
     };
     return t;
+}
+
+mem_request_ret_t create_normal_region(uint64_t pid, void *addr_start, size_t size, uint32_t access)
+{
+    return create_normal_region64(pid, (uint64_t)addr_start, (uint64_t)size, access);
 }
 
 result_t pmos_kernel_debug_log(const char *string, size_t length)

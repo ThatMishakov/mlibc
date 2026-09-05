@@ -577,13 +577,9 @@ extern "C" void *interpreterMain(uintptr_t *entry_stack) {
 		libraryPaths->push_back(path);
 	}
 
-// This is here because libgcc will add a global constructor on glibc Linux
-// (which is what it believes we are due to the aarch64-linux-gnu toolchain)
-// in order to check if LSE atomics are supported.
-//
-// This is not necessary on a custom Linux toolchain and is purely an artifact of
-// using the host toolchain.
-#if defined(__aarch64__) && defined(__gnu_linux__)
+	// This is not only a Linux problem...
+#define GLOBAL_CTORS_LD_SO
+#if defined(GLOBAL_CTORS_LD_SO)
 	for (size_t i = 0; i < num_ldso_ctors; i++) {
 		if(rtldConfig.debug)
 			mlibc::infoLogger() << "ldso: Running own constructor at "
@@ -1230,4 +1226,29 @@ extern "C" unsigned long __getauxval(unsigned long type) {
 	}
 }
 
+#endif
+
+#if !defined(MLIBC_STATIC_BUILD)
+extern "C" int peekauxval(unsigned long type, unsigned long *out) {
+	// Find the auxiliary vector by skipping args and environment.
+	auto aux = entryStack;
+	aux += *aux + 1; // Skip argc and all arguments
+	__ensure(!*aux);
+	aux++;
+	while(*aux) // Now, we skip the environment.
+		aux++;
+	aux++;
+
+	// Parse the auxiliary vector.
+	while(true) {
+		auto value = aux + 1;
+		if(*aux == AT_NULL) {
+			return -1;
+		}else if(*aux == type) {
+			*out = *value;
+			return 0;
+		}
+		aux += 2;
+	}
+}
 #endif

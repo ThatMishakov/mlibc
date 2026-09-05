@@ -119,6 +119,8 @@ struct task_register_set {
 #define CREATE_FLAG_COW                 0x20
 #define CREATE_FLAG_ALLOW_DISCONTINUOUS 0x40
 
+#define CREATE_FLAG_FULL (1 << 23)
+
 #ifdef __STDC_HOSTED__
 /// @brief Creates a normal page region
 ///
@@ -126,8 +128,7 @@ struct task_register_set {
 /// depends on the kernel, but normally the page allocation would be delayed untill the memory is
 /// actually accessed. The memory can be safely unallocated using release_region() syscall
 ///
-/// @param pid PID of the process holding where the region should be allocated. Takes TASK_ID_SELF
-/// (0)
+/// @param page_table_id Page table ID, or PAGE_TABLE_SELF (0) for the current process
 /// @param addr_start The suggestion for the virutal address of the new region. The parameter must
 /// be page-aligned,
 ///                   otherwise will ignore it (as if NULL was passed). If the address is
@@ -143,8 +144,9 @@ struct task_register_set {
 /// error otherwise. If the operation was successfull,
 ///          virt_addr contains the address of the new virtual region.
 /// @see release_region()
-mem_request_ret_t create_normal_region(uint64_t pid, void *addr_start, size_t size,
+mem_request_ret_t create_normal_region(uint64_t page_table_id, void *addr_start, size_t size,
                                        uint32_t access);
+mem_request_ret_t create_normal_region64(uint64_t page_table_id, uint64_t addr_start, uint64_t size, uint32_t access);
 
 #define PHYS_REGION_TYPE_DEDUCE (0b000 << 4)
 #define PHYS_REGION_TYPE_FRAMEBUFFER (0b001 << 4)
@@ -160,7 +162,7 @@ mem_request_ret_t create_normal_region(uint64_t pid, void *addr_start, size_t si
  * page aligned, otherwise the error would be returned.
  * @see create_normal_region()
  */
-mem_request_ret_t create_phys_map_region(uint64_t pid, void *addr_start, size_t size,
+mem_request_ret_t create_phys_map_region(uint64_t page_table_id, void *addr_start, size_t size,
                                          uint32_t access, uint64_t phys_addr);
 
 /**
@@ -234,8 +236,13 @@ mem_request_ret_t transfer_region(uint64_t to_page_table, void *region, uint64_t
 /// @param region The start of the region that should be released.
 /// @return SUCCESS if successfull, generic error otherwise
 result_t release_region(uint64_t pid, void *region);
-
+/// @brief Releases a range of memory
+/// @param pid PID of the process holding the region that should be released. Takes TASK_ID_SELF (0)
+/// @param start The start of the range that should be released.
+/// @param len The length of the range that should be released.
+/// @return SUCCESS if successfull, generic error otherwise
 result_t release_memory_range(uint64_t pid, void *start, size_t len);
+result_t release_memory_range64(uint64_t pid, uint64_t start, uint64_t len);
 
 phys_addr_request_t get_page_phys_address(uint64_t task_id, void *region, uint64_t flags);
 phys_addr_request_t get_page_phys_address_from_object(pmos_right_t object_right, uint64_t offset,

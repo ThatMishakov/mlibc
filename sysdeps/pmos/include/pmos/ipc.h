@@ -475,7 +475,7 @@ typedef struct IPC_Stat_Reply {
 /// Message sent by the user process to VFS daemon to open a file
 typedef struct IPC_Open {
     /// Message type (must be IPC_Open_NUM)
-    uint32_t num;
+    uint32_t type;
 
     /// Flags changing the behavior of the open operation
     uint32_t flags;
