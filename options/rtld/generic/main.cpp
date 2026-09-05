@@ -1254,3 +1254,28 @@ extern "C" unsigned long __getauxval(unsigned long type) {
 }
 
 #endif
+
+#if !defined(MLIBC_STATIC_BUILD)
+extern "C" int peekauxval(unsigned long type, unsigned long *out) {
+	// Find the auxiliary vector by skipping args and environment.
+	auto aux = entryStack;
+	aux += *aux + 1; // Skip argc and all arguments
+	__ensure(!*aux);
+	aux++;
+	while(*aux) // Now, we skip the environment.
+		aux++;
+	aux++;
+
+	// Parse the auxiliary vector.
+	while(true) {
+		auto value = aux + 1;
+		if(*aux == AT_NULL) {
+			return -1;
+		}else if(*aux == type) {
+			*out = *value;
+			return 0;
+		}
+		aux += 2;
+	}
+}
+#endif
