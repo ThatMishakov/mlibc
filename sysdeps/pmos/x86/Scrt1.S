@@ -17,8 +17,8 @@ _start:
     leal _GLOBAL_OFFSET_TABLE_+[.-1b](%ebx), %ebx
 
     subl $8, %esp
-    pushl %eax  // entry_stack
     pushl main@GOT(%ebx)
+    pushl %eax  // entry_stack
 
 	call __mlibc_entry@plt
     ud2

@@ -13,8 +13,8 @@ _start:
     movl %esp, %eax
 
     subl $8, %esp
-    pushl %eax  // entry_stack
     pushl $main // main_fn
+    pushl %eax  // entry_stack
 	call __mlibc_entry
     ud2
 .cfi_endproc
