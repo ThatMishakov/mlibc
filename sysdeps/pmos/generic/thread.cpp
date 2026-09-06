@@ -66,7 +66,7 @@ int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
         syscall_kill_task(r.value);
     }};
 
-    auto add_result = add_task_to_group(r.value, __process_task_group);
+    auto add_result = add_task_to_group(r.value, pmos::__process_task_group);
     if (add_result != SUCCESS)
         return kernel_to_errno(add_result);
 
@@ -94,7 +94,7 @@ int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
 } // namespace mlibc
 
 extern "C" void __mlibc_thread_trampoline(void *(*fn)(void *), void *user_arg, Tcb *tcb) {
-    auto set_result = set_namespace(__process_task_group, NAMESPACE_RIGHTS);
+    auto set_result = set_namespace(mlibc::pmos::__process_task_group, NAMESPACE_RIGHTS);
     if (set_result.result != SUCCESS)
         __ensure(!"Failed to set task group namespace for new thread");
 

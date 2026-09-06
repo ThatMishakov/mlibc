@@ -355,8 +355,17 @@ typedef struct IPC_Seek {
     uint16_t whence;
 
     /// Offset to seek to
-    uint64_t offset;
+    int64_t offset;
 } IPC_Seek;
+
+#define IPC_Get_Object_NUM 0x44
+typedef struct IPC_Get_Object {
+    /// Message type (must be IPC_Get_Object_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+} IPC_Get_Object;
 
 #define IPC_Read_Reply_NUM 0x50
 typedef struct IPC_Read_Reply {
@@ -396,6 +405,18 @@ typedef struct IPC_Seek_Reply {
 
     uint64_t new_offset;
 } IPC_Seek_Reply;
+
+#define IPC_Get_Object_Reply_NUM 0x53
+typedef struct IPC_Get_Object_Reply {
+    /// Message type (must be IPC_Get_Object_Reply_NUM)
+    uint32_t type;
+
+    uint16_t flags;
+
+    int16_t result_code;
+
+    /// Memory object is passed as the first right
+} IPC_Get_Object_Reply;
 
 #define IPC_Stat_NUM 0x56
 /// Message sent by the user process to VFS daemon get file stats

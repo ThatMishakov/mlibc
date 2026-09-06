@@ -25,11 +25,20 @@
         __builtin_unreachable();                                                                   \
 })
 
-uint64_t __process_task_group;
-pmos_right_t __posix_server_right = INVALID_RIGHT;
-extern uintptr_t *entryStack;
-
 namespace {
+
+unsigned flags_to_io(unsigned fd_flags) {
+    unsigned io_flags = 0;
+    if (fd_flags & O_APPEND)
+        io_flags |= IPC_FLAG_IO_OP_APPEND;
+    if (fd_flags & O_NONBLOCK)
+        io_flags |= IPC_FLAG_IO_OP_NONBLOCK;
+    return io_flags;
+}
+
+}
+
+namespace mlibc::pmos {
 
 struct RightWrapper {
     pmos_right_t right = INVALID_RIGHT;
@@ -64,19 +73,20 @@ struct OpenFile {
 
 // constexpr unsigned FLAG_ISATTY = 0x01;
 
+#if defined(MLIBC_STATIC_BUILD) || defined(MLIBC_BUILDING_RTLD)
+
+[[ gnu::visibility("protected") ]]
 constinit FutexLock filesystem_mutex;
 // Don't bother freeing this, notably this is needed for ld.so
+[[ gnu::visibility("protected") ]]
 constinit frg::array<OpenFile, __MLIBC_OPEN_MAX> open_files{};
 
+[[ gnu::visibility("protected") ]]
+uint64_t __process_task_group;
+[[ gnu::visibility("protected") ]]
+pmos_right_t __posix_server_right = INVALID_RIGHT;
 
-unsigned flags_to_io(unsigned fd_flags) {
-    unsigned io_flags = 0;
-    if (fd_flags & O_APPEND)
-        io_flags |= IPC_FLAG_IO_OP_APPEND;
-    if (fd_flags & O_NONBLOCK)
-        io_flags |= IPC_FLAG_IO_OP_NONBLOCK;
-    return io_flags;
-}
+namespace {
 
 void init_namespace() {
     unsigned long value;
@@ -129,7 +139,14 @@ void init_fs() {
     }
 }
 
-__attribute__((constructor(49))) void init_sysdeps() {    
+__attribute__((constructor(49))) void init_sysdeps() {
+    // Constructors within ld.so run twice (which is probably a bug)
+
+    static bool initialized = false;
+    if (initialized)
+        return;
+    initialized = true;
+
     init_namespace();
     init_posix_right();
     init_fs();
@@ -137,8 +154,19 @@ __attribute__((constructor(49))) void init_sysdeps() {
 
 } // namespace
 
+#else
+
+extern FutexLock filesystem_mutex;
+// Don't bother freeing this, notably this is needed for ld.so
+extern frg::array<OpenFile, __MLIBC_OPEN_MAX> open_files;
+
+#endif
+
+} // namespace mlibc::pmos
 
 namespace mlibc {
+
+using namespace pmos;
 
 int Sysdeps<Close>::operator()(int fd) {
     if (fd >= __MLIBC_OPEN_MAX || fd < 0)
@@ -287,7 +315,7 @@ int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offse
         .type = IPC_Seek_NUM,
         .flags = 0,
         .whence = static_cast<uint16_t>(whence),
-        .offset = static_cast<uint64_t>(offset),
+        .offset = offset,
     };
     
     auto send_result = send_message_right(io_right, port, &seek_msg, sizeof(seek_msg), nullptr, 0);
@@ -401,8 +429,92 @@ int Sysdeps<Dup2>::operator()(int , int , int) {
     STUB();
 }
 
-int Sysdeps<VmMap>::operator()(void *, size_t , int , int , int , off_t , void **) {
-    STUB();
+int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int fd, off_t offset, void **window) {
+    unsigned map_flags = prot | mmap_flags_to_kernel(flags);
+
+    if (flags & MAP_ANON) {
+        auto result = create_normal_region(TASK_ID_SELF, hint, size, map_flags);
+        if (result.result != SUCCESS) {
+            return kernel_to_errno(result.result);
+        }
+        *window = result.virt_addr;
+        return 0;
+    }
+
+    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+        return EBADF;
+
+    pmos_right_t io_right;
+    {
+        frg::unique_lock lock(filesystem_mutex);
+        io_right = open_files[fd].io_right;
+    }
+
+    if (io_right == INVALID_RIGHT)
+        return EBADF;
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    IPC_Get_Object msg = {
+        .type = IPC_Get_Object_NUM,
+        .flags = 0,
+    };
+
+    auto send_result = send_message_right(io_right, port, &msg, sizeof(msg), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    // TODO: Handle EINTR
+    __ensure(result == SUCCESS);
+
+    pmos_right_t extra_rights[4] = {};
+    auto get_result = accept_rights(port, extra_rights);
+    __ensure(get_result == SUCCESS);
+    frg::scope_exit delete_rights([&] {
+        for (size_t i = 0; i < 4; ++i) {
+            if (extra_rights[i] != INVALID_RIGHT) {
+                delete_right(extra_rights[i]);
+            }
+        }
+    });
+
+    IPC_Get_Object_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Get_Object_Reply_NUM)
+        return EIO;
+
+    if (reply.result_code < 0)
+        return -reply.result_code;
+
+    pmos_right_t mem_object = extra_rights[0];
+
+    map_mem_object_param_t param = {
+        .page_table_id = 0,
+        .object_right = mem_object,
+        .addr_start_uint = (uintptr_t)hint,
+        .size = size,
+        .offset_object = static_cast<uint64_t>(offset),
+        .offset_start = 0,
+        .object_size = size,
+        .access_flags = map_flags,
+    };
+
+    auto map_result = map_mem_object(&param);
+    if (map_result.result != SUCCESS) {
+        return kernel_to_errno(map_result.result);
+    }
+
+    *window = map_result.virt_addr;
+    return 0;
 }
 
 int Sysdeps<Sleep>::operator()(time_t *secs, long *nanos)
