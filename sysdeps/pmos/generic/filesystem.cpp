@@ -5,6 +5,7 @@
 #include <frg/array.hpp>
 #include <frg/scope_exit.hpp>
 #include <frg/eternal.hpp>
+#include <frg/vector.hpp>
 
 #include <pmos/system.h>
 #include <mlibc/threads.hpp>
@@ -139,8 +140,25 @@ __attribute__((constructor(49))) void init_sysdeps() {
 
 namespace mlibc {
 
-int Sysdeps<Close>::operator()(int) {
-    STUB();
+int Sysdeps<Close>::operator()(int fd) {
+    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+        return EBADF;
+
+    pmos_right_t io_right, file_right;
+    {
+        frg::unique_lock lock(filesystem_mutex);
+        io_right = open_files[fd].io_right;
+        file_right = open_files[fd].op_right;
+        open_files[fd].io_right = INVALID_RIGHT;
+        open_files[fd].op_right = INVALID_RIGHT;
+    }
+
+    if (io_right == INVALID_RIGHT)
+        return EBADF;
+
+    delete_right(io_right);
+    delete_right(file_right);
+    return 0;
 }
 
 int Sysdeps<Write>::operator()(int fd, const void *buff, size_t count, ssize_t *bytes_written) {
@@ -189,8 +207,58 @@ int Sysdeps<Write>::operator()(int fd, const void *buff, size_t count, ssize_t *
     return -reply.result_code;
 }
 
-int Sysdeps<Read>::operator()(int , void *, size_t , ssize_t *) {
-    STUB();
+int Sysdeps<Read>::operator()(int fd, void *buff, size_t count, ssize_t *bytes_read) {
+    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+        return EBADF;
+
+    pmos_right_t io_right;
+    {
+        frg::unique_lock lock(filesystem_mutex);
+        io_right = open_files[fd].io_right;
+    }
+
+    if (io_right == INVALID_RIGHT)
+        return EBADF;
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    IPC_Read read_msg = {
+        .type = IPC_Read_NUM,
+        .flags = flags_to_io(open_files[fd].flags),
+        .start_offset = 0, // This is ignored since there's no fixed offset flag set
+        .max_size = count,
+    };
+
+    auto send_result = send_message_right(io_right, port, &read_msg, sizeof(read_msg), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    // TODO: Handle EINTR (as above)
+    __ensure(result == SUCCESS);
+
+    frg::vector<uint8_t, MemoryAllocator> reply_data(getAllocator());
+    reply_data.resize(reply_descr.size);
+    result = get_first_message(reinterpret_cast<char *>(reply_data.data()), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    IPC_Read_Reply *reply = (IPC_Read_Reply *)reply_data.data();
+
+    if (reply->type != IPC_Read_Reply_NUM)
+        return EIO;
+
+    if (reply->result_code)
+        return -reply->result_code;
+
+    *bytes_read = reply_descr.size - sizeof(IPC_Read_Reply);
+    memcpy(buff, reply->data, *bytes_read);
+    return 0;
 }
 
 int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offset) {
@@ -294,8 +362,8 @@ int Sysdeps<Open>::operator()(const char *pathname, int flags, mode_t mode, int 
     frg::unique_lock lock(filesystem_mutex);
     for (unsigned i = 0; i < __MLIBC_OPEN_MAX; ++i) {
         if (open_files[i].io_right == INVALID_RIGHT) {
-            open_files[i].io_right = extra_rights[0];
-            open_files[i].op_right = extra_rights[1];
+            open_files[i].io_right = extra_rights[1];
+            open_files[i].op_right = extra_rights[0];
             open_files[i].flags    = flags;
             *fd = i;
 

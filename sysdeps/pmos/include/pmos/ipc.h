@@ -317,7 +317,7 @@ typedef struct IPC_Write {
     /// Flags changing the behaviour
     uint32_t flags;
 
-#define IPC_FLAG_IO_OP_SEEK 0x01
+#define IPC_FLAG_IO_OP_FIXED_OFFSET 0x01
 #define IPC_FLAG_IO_OP_APPEND 0x02
 #define IPC_FLAG_IO_OP_NONBLOCK 0x04
 
@@ -1258,15 +1258,6 @@ typedef struct IPC_Register_Process {
 
     /// Flags
     uint32_t flags;
-
-    /// Port for signals and notifications
-    pmos_port_t signal_port;
-
-    /// Task group ID
-    uint64_t task_group_id;
-
-    /// Worker task ID
-    uint64_t worker_task_id;
 } IPC_Register_Process;
 
 #define IPC_Register_Process_Reply_NUM 0x181
@@ -1279,10 +1270,10 @@ typedef struct IPC_Register_Process_Reply {
 #define REGISTER_PROCESS_REPLY_FLAG_EXISITING 0x01
 
     /// Result code
-    int64_t result;
+    int32_t result;
 
     /// PID
-    int64_t pid;
+    int32_t pid;
 } IPC_Register_Process_Reply;
 
 #define IPC_PID_For_Task_NUM 0x182
