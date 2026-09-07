@@ -24,6 +24,13 @@ uint64_t timespec_to_kernel(const struct timespec *ts) {
     return ts->tv_sec * (uint64_t)1000000000 + ts->tv_nsec;
 }
 
+struct timespec kernel_to_timespec(uint64_t time) {
+    struct timespec ts;
+    ts.tv_sec = time / 1000000000;
+    ts.tv_nsec = time % 1000000000;
+    return ts;
+}
+
 unsigned mmap_flags_to_kernel(int flags) {
     unsigned result = 0;
     if (flags & MAP_PRIVATE)

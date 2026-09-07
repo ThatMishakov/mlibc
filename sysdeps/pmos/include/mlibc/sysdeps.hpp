@@ -28,7 +28,8 @@ struct PmosSysdepTags :
 	Sleep,
 	PrepareStack,
 	Clone,
-	ThreadExit
+	ThreadExit,
+	Stat
 {};
 
 template<typename Tag>
