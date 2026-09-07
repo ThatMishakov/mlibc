@@ -533,6 +533,85 @@ int Sysdeps<Sleep>::operator()(time_t *secs, long *nanos)
     return -result.result;
 }
 
+int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int flags, struct stat *statbuf) {
+    if (!statbuf)
+        return EINVAL;
+
+    pmos_right_t file_right;
+
+    switch (fsfdt) {
+        case fsfd_target::path:
+            file_right = __posix_server_right;
+            break;
+        case fsfd_target::fd:
+            flags = AT_EMPTY_PATH;
+            [[fallthrough]];
+
+        case fsfd_target::fd_path:
+            if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+                return EBADF;
+            
+            {
+                frg::unique_lock lock(filesystem_mutex);
+                file_right = open_files[fd].op_right;
+            }
+            if (file_right == INVALID_RIGHT)
+                return EBADF;
+            break;
+        default:
+            return ENOSYS;
+    }
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    size_t path_len = strlen(path);
+    size_t message_size = sizeof(IPC_Stat) + path_len;
+    IPC_Stat *message = (IPC_Stat *)alloca(message_size);
+    message->type = IPC_Stat_NUM;
+    message->flags = flags;
+    memcpy(message->path, path, path_len);
+
+    auto send_result = send_message_right(file_right, port, message, message_size, nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Stat_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Stat_Reply_NUM)
+        return EIO;
+
+    if (reply.result < 0)
+        return -reply.result;
+
+    statbuf->st_dev = reply.st_dev;
+    statbuf->st_ino = reply.st_ino;
+    statbuf->st_nlink = reply.st_nlink;
+    statbuf->st_mode = reply.st_mode;
+    statbuf->st_uid = reply.st_uid;
+    statbuf->st_gid = reply.st_gid;
+    statbuf->st_rdev = reply.st_rdev;
+    statbuf->st_size = reply.st_size;
+    statbuf->st_blksize = reply.st_blksize;
+    statbuf->st_blocks = reply.st_blocks;
+
+    statbuf->st_atim = kernel_to_timespec(reply.st_atim_tv_nsec);
+    statbuf->st_mtim = kernel_to_timespec(reply.st_mtim_tv_nsec);
+    statbuf->st_ctim = kernel_to_timespec(reply.st_ctim_tv_nsec);
+
+    return 0;
+}
+
 }
 
 pmos_port_t __pmos_prepare_reply_port()

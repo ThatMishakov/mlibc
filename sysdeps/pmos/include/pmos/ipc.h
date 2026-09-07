@@ -427,12 +427,6 @@ typedef struct IPC_Stat {
     /// Flags changing the behavior of the open operation
     uint32_t flags;
 
-    /// Port where the reply will be sent
-    pmos_port_t reply_port;
-
-    /// ID of the file system consumer
-    uint64_t fs_consumer_id;
-
     /// Path of the file
     char path[];
 } IPC_Stat;
@@ -453,7 +447,7 @@ typedef struct IPC_Stat_Reply {
     uint64_t st_dev;
 
     /// File serial number
-    uint64_t ino_t;
+    uint64_t st_ino;
 
     /// Mode of the file
     uint64_t st_mode;
@@ -462,10 +456,10 @@ typedef struct IPC_Stat_Reply {
     uint64_t st_nlink;
 
     /// User ID of the file
-    uint64_t st_uid;
+    uint32_t st_uid;
 
     /// Group ID of the file
-    uint64_t st_gid;
+    uint32_t st_gid;
 
     /// Device ID
     uint64_t st_rdev;
@@ -474,15 +468,12 @@ typedef struct IPC_Stat_Reply {
     uint64_t st_size;
 
     /// Time of last access
-    uint64_t st_atim_tv_sec;
     uint64_t st_atim_tv_nsec;
 
     /// Time of last modification
-    uint64_t st_mtim_tv_sec;
     uint64_t st_mtim_tv_nsec;
 
     /// Time of last status change
-    uint64_t st_ctim_tv_sec;
     uint64_t st_ctim_tv_nsec;
 
     /// Block size
@@ -819,6 +810,20 @@ typedef struct IPC_FS_Close {
     uint64_t file_id;
 } IPC_FS_Close;
 
+#define IPC_FS_Stat_Dynamic_NUM 0xC7
+/// Message sent by the VFS daemon to a filesystem driver to get file stats
+/// that can change dynamically
+typedef struct IPC_FS_Stat_Dynamic {
+    /// Message type (must be IPC_FS_Stat_Dynamic_NUM)
+    uint32_t type;
+
+    /// Flags changing the behaviour
+    uint32_t flags;
+
+    /// Inode
+    uint64_t inode;
+} IPC_FS_Stat_Dynamic;
+
 #define IPC_FS_Open_Reply_NUM 0xD0
 typedef struct IPC_FS_Open_Reply {
     /// Message type (must be IPC_FS_OPEN_REPLY_NUM)
@@ -873,6 +878,21 @@ typedef struct IPC_FS_Resolve_Path_Reply {
 
     /// ID of the file node
     uint64_t file_id;
+
+    /// Mode of the file node
+    uint64_t st_mode;
+
+    /// User ID of the file node
+    uint32_t st_uid;
+
+    /// Group ID of the file node
+    uint32_t st_gid;
+
+    /// Device ID
+    uint64_t st_rdev;
+
+    /// Block size
+    uint64_t st_blksize;
 } IPC_FS_Resolve_Path_Reply;
 
 #define IPC_FS_Dup_Reply_NUM 0xD5
@@ -938,6 +958,32 @@ typedef struct IPC_FS_Mount_Request_Result {
     /// Result code
     int16_t result_code;
 } IPC_FS_Mount_Request_Result;
+
+#define IPC_FS_Stat_Dynamic_Reply_NUM 0xD9
+typedef struct IPC_FS_Stat_Dynamic_Reply {
+    /// Message type (must be IPC_FS_Stat_Dynamic_Reply_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint16_t flags;
+
+    /// Result code indicating the outcome of the operation
+    int16_t result_code;
+
+    /// File size
+    uint64_t st_size;
+
+    /// Number of hard links to the file
+    uint64_t st_nlink;
+
+    uint64_t st_atim_tv_nsec;
+    uint64_t st_mtim_tv_nsec;
+    uint64_t st_ctim_tv_nsec;
+    uint64_t st_btim_tv_nsec;
+
+    /// Number of blocks allocated
+    uint64_t st_blocks;
+} IPC_FS_Stat_Dynamic_Reply;
 
 #define IPC_Pipe_Open_NUM 0xE0
 typedef struct IPC_Pipe_Open {
