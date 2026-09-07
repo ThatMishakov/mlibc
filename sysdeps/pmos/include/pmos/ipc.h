@@ -367,6 +367,19 @@ typedef struct IPC_Get_Object {
     uint32_t flags;
 } IPC_Get_Object;
 
+#define IPC_Poll_NUM 0x45
+typedef struct IPC_Poll {
+    /// Message type (must be IPC_Poll_NUM)
+    uint32_t type;
+
+#define IPC_POLL_FLAG_NONBLOCK 0x01
+    /// Flags
+    uint16_t flags;
+
+    /// Events to poll for
+    uint16_t events;
+} IPC_Poll;
+
 #define IPC_Read_Reply_NUM 0x50
 typedef struct IPC_Read_Reply {
     /// Message type (must be IPC_Read_Reply_NUM)
@@ -417,6 +430,19 @@ typedef struct IPC_Get_Object_Reply {
 
     /// Memory object is passed as the first right
 } IPC_Get_Object_Reply;
+
+#define IPC_Poll_Reply_NUM 0x55
+typedef struct IPC_Poll_Reply {
+    /// Message type (must be IPC_Poll_Reply_NUM)
+    uint32_t type;
+
+    uint16_t flags;
+
+    int16_t result_code;
+
+    /// Events that occurred
+    uint16_t events;
+} IPC_Poll_Reply;
 
 #define IPC_Stat_NUM 0x56
 /// Message sent by the user process to VFS daemon get file stats
