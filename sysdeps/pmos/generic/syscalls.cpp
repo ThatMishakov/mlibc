@@ -310,15 +310,15 @@ result_t send_message_port(uint64_t port, size_t size, const void *message)
 #endif
 }
 
-result_t delete_receive_right(pmos_port_t port, pmos_right_t right)
+result_t delete_receive_right(pmos_port_t port, pmos_right_t right, unsigned flags)
 {
     if (!port || !right)
         return SUCCESS;
 
     #ifdef __i386__
-    return syscall32_4(SYSCALL_DELETE_RECEIVE_RIGHT, (uint32_t)port, port >> 32, (uint32_t)right, right >> 32).result;
+    return syscall32_4(SYSCALL_DELETE_RECEIVE_RIGHT | (flags << 8), (uint32_t)port, port >> 32, (uint32_t)right, right >> 32).result;
     #else
-    return syscall2(SYSCALL_DELETE_RECEIVE_RIGHT, port, right).result;
+    return syscall2(SYSCALL_DELETE_RECEIVE_RIGHT | (flags << 8), port, right).result;
     #endif
 }
 
