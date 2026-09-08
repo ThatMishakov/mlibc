@@ -86,13 +86,13 @@ ports_request_t create_port(uint64_t owner, uint32_t flags)
     return t;
 }
 
-right_request_t create_right(uint64_t port_id, pmos_right_t *id_in_reciever, unsigned flags)
+right_request_t create_right(uint64_t port_id, pmos_right_t *id_in_receiver, unsigned flags)
 {
     syscall_r result;
 #ifdef __32BITSYSCALL
-    result = syscall32_3(SYSCALL_CREATE_RIGHT | (flags << 8), (uint32_t)port_id, port_id >> 32, (uintptr_t)id_in_reciever);
+    result = syscall32_3(SYSCALL_CREATE_RIGHT | (flags << 8), (uint32_t)port_id, port_id >> 32, (uintptr_t)id_in_receiver);
 #else
-    result = syscall2(SYSCALL_CREATE_RIGHT | (flags << 8), port_id, reinterpret_cast<uint64_t>(id_in_reciever));
+    result = syscall2(SYSCALL_CREATE_RIGHT | (flags << 8), port_id, reinterpret_cast<uint64_t>(id_in_receiver));
 #endif
     return (right_request_t) {
         .result = static_cast<result_t>(result.result),
