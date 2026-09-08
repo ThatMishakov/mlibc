@@ -1,8 +1,7 @@
 #ifndef _ABIBITS_SIGSET_T_H
 #define _ABIBITS_SIGSET_T_H
+#include <stdint.h>
 
-typedef struct {
-	unsigned long __sig[1024 / (8 * sizeof(long))];
-} sigset_t;
+typedef uint64_t sigset_t;
 
 #endif /* _ABIBITS_SIGSET_T_H */

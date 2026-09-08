@@ -31,7 +31,8 @@ struct PmosSysdepTags :
 	ThreadExit,
 	Stat,
 	Poll,
-	Ppoll
+	Ppoll,
+	Sigaction
 {};
 
 template<typename Tag>
