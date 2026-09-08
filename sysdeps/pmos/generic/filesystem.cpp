@@ -618,7 +618,7 @@ int Sysdeps<Poll>::operator()(struct pollfd *fds, nfds_t count, int timeout, int
     auto ms = timeout % 1000;
     ts.tv_sec = timeout / 1000;
     ts.tv_nsec = ms * 1000000;
-    return Sysdeps<Ppoll>()(fds, count, timeout > 0 ? &ts : nullptr, nullptr, num_events);
+    return Sysdeps<Ppoll>()(fds, count, timeout >= 0 ? &ts : nullptr, nullptr, num_events);
 }
 
 struct ReceiveRightHandler {
