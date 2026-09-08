@@ -215,7 +215,7 @@ int Sysdeps<Write>::operator()(int fd, const void *buff, size_t count, ssize_t *
 
     auto send_result = send_message_right(io_right, port, write_msg, sizeof(IPC_Write) + count, nullptr, 0);
     if (send_result.result != SUCCESS)
-        return -send_result.result;
+        return kernel_to_errno(send_result.result);
 
     Message_Descriptor reply_descr;
     auto result = syscall_get_message_info(&reply_descr, port, 0);
@@ -262,7 +262,7 @@ int Sysdeps<Read>::operator()(int fd, void *buff, size_t count, ssize_t *bytes_r
 
     auto send_result = send_message_right(io_right, port, &read_msg, sizeof(read_msg), nullptr, 0);
     if (send_result.result != SUCCESS)
-        return -send_result.result;
+        return kernel_to_errno(send_result.result);
 
     Message_Descriptor reply_descr;
     auto result = syscall_get_message_info(&reply_descr, port, 0);

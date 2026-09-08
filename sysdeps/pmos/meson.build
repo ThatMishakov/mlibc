@@ -114,6 +114,7 @@ libc_sources += files(
 	'generic/helpers.cpp',
 	'generic/filesystem.cpp',
 	'generic/thread.cpp',
+	'generic/signal.cpp',
 
 	host_machine.cpu_family() + '/thread.S',
 )
