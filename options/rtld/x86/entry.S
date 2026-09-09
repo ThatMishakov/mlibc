@@ -8,6 +8,7 @@ PROC_START(_start)
 	andl $-16, %esp
 
 	call relocateSelf
+	lea 4(%esp), %esp
 
 	lea -12(%esp), %esp
 	push %esi

@@ -2,6 +2,8 @@
 
 PROC_START(_start)
 .cfi_undefined rip
+
+	mov %rsp, %rdi
 	call relocateSelf
 
 	mov %rsp, %rdi
