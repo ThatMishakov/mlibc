@@ -69,18 +69,29 @@ DebugInterface globalDebugInterface;
 #ifndef MLIBC_STATIC_BUILD
 
 // Use a PC-relative instruction sequence to find our runtime load address.
-uintptr_t getLdsoBase() {
-#if defined(__x86_64__) || defined(__i386__) || defined(__aarch64__) || defined(__m68k__)
-	// On x86_64, the first GOT entry holds the link-time address of _DYNAMIC.
-	// TODO: This isn't guaranteed on AArch64, so this might fail with some linkers.
-	auto linktime_dynamic = reinterpret_cast<uintptr_t>(_GLOBAL_OFFSET_TABLE_[0]);
-	auto runtime_dynamic = reinterpret_cast<uintptr_t>(_DYNAMIC);
-	return runtime_dynamic - linktime_dynamic;
-#elif defined(__riscv) || defined(__loongarch64)
-	return reinterpret_cast<uintptr_t>(&__ehdr_start);
-#else
-	#error Unknown architecture!
-#endif
+uintptr_t getLdsoBase(uintptr_t *stack_base) {
+	// Find the auxiliary vector by skipping args and environment.
+	auto aux = stack_base;
+	aux += *aux + 1; // Skip argc and all arguments
+	__ensure(!*aux);
+	aux++;
+	while(*aux) // Now, we skip the environment.
+		aux++;
+	aux++;
+
+	// Parse the auxiliary vector.
+	while(true) {
+		auto value = aux + 1;
+		if(*aux == AT_NULL)
+			__builtin_trap();
+
+		if(*aux == AT_BASE)
+			return *value;
+
+		aux += 2;
+	}
+
+	__builtin_trap();
 }
 
 #if !defined(__m68k__)
@@ -89,7 +100,7 @@ uintptr_t getLdsoBase() {
 // - There are no references to external symbols.
 // Note that this code is fragile in the sense that it must not contain relocations itself.
 // TODO: Use tooling to verify this at compile time.
-extern "C" void relocateSelf() {
+extern "C" void relocateSelf(uintptr_t *stack_base) {
 	size_t rela_offset = 0;
 	size_t rela_size = 0;
 	size_t rel_offset = 0;
@@ -108,7 +119,7 @@ extern "C" void relocateSelf() {
 		}
 	}
 
-	auto ldso_base = getLdsoBase();
+	auto ldso_base = getLdsoBase(stack_base);
 
 	for(size_t disp = 0; disp < rela_size; disp += sizeof(elf_rela)) {
 		auto reloc = reinterpret_cast<elf_rela *>(ldso_base + rela_offset + disp);
@@ -117,7 +128,7 @@ extern "C" void relocateSelf() {
 		if(ELF_R_SYM(reloc->r_info))
 			__builtin_trap();
 
-		auto p = reinterpret_cast<uint64_t *>(ldso_base + reloc->r_offset);
+		auto p = reinterpret_cast<uintptr_t *>(ldso_base + reloc->r_offset);
 		switch(type) {
 		case R_RELATIVE:
 			*p = ldso_base + reloc->r_addend;
@@ -134,7 +145,7 @@ extern "C" void relocateSelf() {
 		if(ELF_R_SYM(reloc->r_info))
 			__builtin_trap();
 
-		auto p = reinterpret_cast<uint64_t *>(ldso_base + reloc->r_offset);
+		auto p = reinterpret_cast<uintptr_t *>(ldso_base + reloc->r_offset);
 		switch(type) {
 		case R_RELATIVE:
 			*p += ldso_base;
@@ -224,7 +235,7 @@ extern "C" void *lazyRelocate(SharedObject *object, unsigned int rel_index) {
 	//mlibc::infoLogger() << "Lazy relocation to " << symbol_str
 	//		<< " resolved to " << pointer << frg::endlog;
 
-	*(uint64_t *)(object->baseAddress + reloc->r_offset) = p->virtualAddress();
+	*(uintptr_t *)(object->baseAddress + reloc->r_offset) = p->virtualAddress();
 	return (void *)p->virtualAddress();
 }
 
@@ -378,7 +389,7 @@ extern "C" void *interpreterMain(uintptr_t *entry_stack) {
 	ctor_fn *ldso_ctors = nullptr;
 	size_t num_ldso_ctors = 0;
 
-	auto ldso_base = getLdsoBase();
+	auto ldso_base = getLdsoBase(entry_stack);
 	if(rtldConfig.debug) {
 		mlibc::infoLogger() << "ldso: Own base address is: 0x"
 				<< frg::hex_fmt(ldso_base) << frg::endlog;
