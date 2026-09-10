@@ -1,5 +1,6 @@
     .text
     .global syscall32_0
+    .hidden syscall32_0
     .type syscall32_0, @function
 syscall32_0:
     popl %eax
@@ -33,6 +34,7 @@ syscall_return:
 
     .text
     .global syscall32_1
+    .hidden syscall32_1
     .type syscall32_1, @function
 syscall32_1:
     popl %eax
@@ -54,6 +56,7 @@ syscall32_1:
     jmp syscall_return
 
     .global syscall32_2
+    .hidden syscall32_2
     .type syscall32_2, @function
 syscall32_2:
     popl %eax
@@ -76,6 +79,7 @@ syscall32_2:
     jmp syscall_return
 
     .global syscall32_3
+    .hidden syscall32_3
     .type syscall32_3, @function
 syscall32_3:
     popl %eax
@@ -99,6 +103,7 @@ syscall32_3:
     jmp syscall_return
 
     .global syscall32_4
+    .hidden syscall32_4
     .type syscall32_4, @function
 syscall32_4:
     popl %eax
@@ -123,6 +128,7 @@ syscall32_4:
     jmp syscall_return
 
     .global syscall32_5
+    .hidden syscall32_5
     .type syscall32_5, @function
 syscall32_5:
     popl %eax
@@ -151,6 +157,7 @@ syscall32_5:
     jmp syscall_return
 
     .global syscall32_6
+    .hidden syscall32_6
     .type syscall32_6, @function
 syscall32_6:
     popl %eax
@@ -180,6 +187,7 @@ syscall32_6:
     jmp syscall_return
 
     .global syscall32_7
+    .hidden syscall32_7
     .type syscall32_7, @function
 syscall32_7:
     popl %eax
@@ -210,6 +218,7 @@ syscall32_7:
     jmp syscall_return
 
     .global syscall32_8
+    .hidden syscall32_8
     .type syscall32_8, @function
 syscall32_8:
     popl %eax
