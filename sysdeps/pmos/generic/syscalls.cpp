@@ -617,4 +617,18 @@ void pmos_syscall_exit(unsigned status, bool force)
     __builtin_unreachable();
 }
 
+right_restrict_result_t restrict_right(pmos_right_t right, uint32_t mask)
+{
+    #ifdef __32BITSYSCALL
+    auto result = syscall32_3(SYSCALL_RESTRICT_RIGHT, (uint32_t)right, right >> 32, mask);
+    #else
+    auto result = syscall2(SYSCALL_RESTRICT_RIGHT, right, mask);
+    #endif
+
+    return {
+        .result = static_cast<result_t>(result.result),
+        .mask = static_cast<uint32_t>(result.value),
+    };
+}
+
 } // extern "C"

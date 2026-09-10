@@ -469,6 +469,23 @@ result_t delete_right_raw(pmos_right_t right_id);
 /// @return 0 on success, -errno (typical kernel thing) on error
 result_t delete_receive_right(pmos_port_t port, pmos_right_t receive_right_id, unsigned flags);
 
+#define RIGHT_PERMISSION_READ 0x01
+#define RIGHT_PERMISSION_WRITE 0x02
+#define RIGHT_PERMISSION_EXECUTE 0x04
+
+#define RIGHT_PERMISSION_MANAGE 0x08
+
+typedef struct right_restrict_result_t {
+    result_t result;
+    uint32_t mask;
+} right_restrict_result_t;
+
+/// @brief Restricts the permissions of the right
+///
+/// This syscall modifies the permission bitmask of the right, effectively applying an AND operation
+/// to its bits, and returning the old mask
+right_restrict_result_t restrict_right(pmos_right_t right, uint32_t mask);
+
 typedef struct message_extra_t {
     pmos_right_t extra_rights[4];
 } message_extra_t;

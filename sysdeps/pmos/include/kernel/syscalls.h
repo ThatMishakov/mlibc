@@ -105,5 +105,6 @@
 #define SYSCALL_FUTEX_WAIT                  64
 #define SYSCALL_FUTEX_WAKE                  65
 #define SYSCALL_SLEEP                       66
+#define SYSCALL_RESTRICT_RIGHT              67
 
 #endif
