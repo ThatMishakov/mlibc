@@ -192,9 +192,6 @@ typedef struct map_mem_object_param_t {
     /// page aligned if not using CoW, or have the same offset to (offset_start % PAGE_SIZE), in which case
     /// the beginning would be willed with 0.
     uint64_t offset_object;
-    /// Offset in the page table, from which the pages will be copied. Must be 0 if
-    /// FLAG_COW is not set.
-    uint64_t offset_start;
     /// Size of the memory object (in bytes). If smaller than size and region is CoW,
     /// the trailing space will be zeroed.
     uint64_t object_size;
