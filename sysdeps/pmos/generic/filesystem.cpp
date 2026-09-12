@@ -504,7 +504,6 @@ int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int
         .addr_start_uint = (uintptr_t)hint,
         .size = size,
         .offset_object = static_cast<uint64_t>(offset),
-        .offset_start = 0,
         .object_size = size,
         .access_flags = map_flags,
     };
