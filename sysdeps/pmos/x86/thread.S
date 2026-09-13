@@ -20,6 +20,11 @@
     pushl %ecx
     pushl %eax
 
+    call 1f
+1:
+    popl %ebx
+    leal _GLOBAL_OFFSET_TABLE_+[.-1b](%ebx), %ebx
+
     // Do a call so that the stack is aligned per the ABI
     call __mlibc_thread_trampoline@plt
 
