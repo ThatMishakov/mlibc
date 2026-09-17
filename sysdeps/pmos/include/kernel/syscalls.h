@@ -106,5 +106,7 @@
 #define SYSCALL_FUTEX_WAKE                  65
 #define SYSCALL_SLEEP                       66
 #define SYSCALL_RESTRICT_RIGHT              67
+#define SYSCALL_SET_TCB                     68
+#define SYSCALL_GET_TCB                     69
 
 #endif

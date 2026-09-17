@@ -22,11 +22,13 @@ namespace mlibc {
 int Sysdeps<TcbSet>::operator()(void *ptr) {
     #if defined(__x86_64__) || defined(__i386__)
     auto tcb_ptr = ptr;
+    #elif defined(__m68k__)
+    auto tcb_ptr = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(ptr) + sizeof(Tcb) + 0x7000);
     #else
     auto tcb_ptr = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(ptr) + sizeof(Tcb));
     #endif
 
-    auto result = pmos_set_registers(TASK_ID_SELF, SEGMENT_TCB, tcb_ptr);
+    auto result = pmos_set_tcb(tcb_ptr);
     return kernel_to_errno(result);
 }
 
@@ -86,3 +88,14 @@ int Sysdeps<FutexWait>::operator()(int *pointer, int expected, const struct time
 }
 
 }
+
+#ifdef __m68k__
+extern "C"
+#if MLIBC_BUILDING_RTLD
+__attribute__((visibility("hidden")))
+#endif
+void *__m68k_read_tp() {
+	// see mlibc::get_current_tcb
+	return pmos_get_tcb();
+}
+#endif

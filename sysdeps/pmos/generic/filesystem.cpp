@@ -17,6 +17,7 @@
 #include <sys/auxv.h>
 #include <sys/mman.h>
 #include <alloca.h>
+#include <fcntl.h>
 
 #include "common.hpp"
 
