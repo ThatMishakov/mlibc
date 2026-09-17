@@ -259,6 +259,114 @@ syscall_r syscall32_7(uint32_t call_n_flags, uint32_t arg1, uint32_t arg2, uint3
 syscall_r syscall32_8(uint32_t call_n_flags, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7, uint32_t arg8);
 
 }
+#elif defined(__m68k__)
+
+// Parameters are in d0-d7, and return is in d0-d1, a0-a1
+
+static inline syscall_r syscall32_0(uint32_t call_n_flags)
+{
+    register uintptr_t d0 asm("d0") = call_n_flags, d1 asm("d1"), a0 asm("a0"), a1 asm("a1");
+    asm volatile("trap #0\n\t"
+                 : "+r"(d0), "=r"(d1), "=r"(a0), "=r"(a1)
+                 : "r"(d0)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)((d0 & 0xFFFFFFFF) | ((uint64_t)d1 << 32));
+    ret.value = ((a0 & 0xFFFFFFFF) | ((uint64_t)a1 << 32));
+    return ret;
+}
+
+static inline syscall_r syscall32_1(uint32_t call_n_flags, uint32_t arg1)
+{
+    register uintptr_t d0 asm("d0") = call_n_flags, d1 asm("d1") = arg1, a0 asm("a0"), a1 asm("a1");
+    asm volatile("trap #0\n\t"
+                 : "+r"(d0), "+r"(d1), "=r"(a0), "=r"(a1)
+                 : "r"(d0), "r"(d1)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)((d0 & 0xFFFFFFFF) | ((uint64_t)d1 << 32));
+    ret.value = ((a0 & 0xFFFFFFFF) | ((uint64_t)a1 << 32));
+    return ret;
+}
+
+static inline syscall_r syscall32_2(unsigned call_n_flags, uint32_t arg1, uint32_t arg2)
+{
+    register uintptr_t d0 asm("d0") = call_n_flags, d1 asm("d1") = arg1, a0 asm("a0") = arg2, a1 asm("a1");
+    asm volatile("trap #0\n\t"
+                 : "+r"(d0), "+r"(d1), "+r"(a0), "=r"(a1)
+                 : "r"(d0), "r"(d1), "r"(a0)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)((d0 & 0xFFFFFFFF) | ((uint64_t)d1 << 32));
+    ret.value = ((a0 & 0xFFFFFFFF) | ((uint64_t)a1 << 32));
+    return ret;
+}
+
+static inline syscall_r syscall32_3(unsigned call_n_flags, uint32_t arg1, uint32_t arg2, uint32_t arg3)
+{
+    register uintptr_t d0 asm("d0") = call_n_flags, d1 asm("d1") = arg1, a0 asm("a0") = arg2, a1 asm("a1") = arg3;
+    asm volatile("trap #0\n\t"
+                 : "+r"(d0), "+r"(d1), "+r"(a0), "+r"(a1)
+                 : "r"(d0), "r"(d1), "r"(a0), "r"(a1)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)((d0 & 0xFFFFFFFF) | ((uint64_t)d1 << 32));
+    ret.value = ((a0 & 0xFFFFFFFF) | ((uint64_t)a1 << 32));
+    return ret;
+}
+
+static inline syscall_r syscall32_4(unsigned call_n_flags, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4)
+{
+    register uintptr_t d0 asm("d0") = call_n_flags, d1 asm("d1") = arg1, a0 asm("a0") = arg2, a1 asm("a1") = arg3, d2 asm("d2") = arg4;
+    asm volatile("trap #0\n\t"
+                 : "+r"(d0), "+r"(d1), "+r"(a0), "+r"(a1)
+                 : "r"(d0), "r"(d1), "r"(a0), "r"(a1), "r"(d2)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)((d0 & 0xFFFFFFFF) | ((uint64_t)d1 << 32));
+    ret.value = ((a0 & 0xFFFFFFFF) | ((uint64_t)a1 << 32));
+    return ret;
+}
+
+static inline syscall_r syscall32_5(unsigned call_n_flags, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5)
+{
+    register uintptr_t d0 asm("d0") = call_n_flags, d1 asm("d1") = arg1, a0 asm("a0") = arg2, a1 asm("a1") = arg3, d2 asm("d2") = arg4, d3 asm("d3") = arg5;
+    asm volatile("trap #0\n\t"
+                 : "+r"(d0), "+r"(d1), "+r"(a0), "+r"(a1)
+                 : "r"(d0), "r"(d1), "r"(a0), "r"(a1), "r"(d2), "r"(d3)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)((d0 & 0xFFFFFFFF) | ((uint64_t)d1 << 32));
+    ret.value = ((a0 & 0xFFFFFFFF) | ((uint64_t)a1 << 32));
+    return ret;
+}
+
+static inline syscall_r syscall32_6(unsigned call_n_flags, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5, uint32_t arg6)
+{
+    register uintptr_t d0 asm("d0") = call_n_flags, d1 asm("d1") = arg1, a0 asm("a0") = arg2, a1 asm("a1") = arg3, d2 asm("d2") = arg4, d3 asm("d3") = arg5, d4 asm("d4") = arg6;
+    asm volatile("trap #0\n\t"
+                 : "+r"(d0), "+r"(d1), "+r"(a0), "+r"(a1)
+                 : "r"(d0), "r"(d1), "r"(a0), "r"(a1), "r"(d2), "r"(d3), "r"(d4)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)((d0 & 0xFFFFFFFF) | ((uint64_t)d1 << 32));
+    ret.value = ((a0 & 0xFFFFFFFF) | ((uint64_t)a1 << 32));
+    return ret;
+}
+
+static inline syscall_r syscall32_7(unsigned call_n_flags, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7)
+{
+    register uintptr_t d0 asm("d0") = call_n_flags, d1 asm("d1") = arg1, a0 asm("a0") = arg2, a1 asm("a1") = arg3, d2 asm("d2") = arg4, d3 asm("d3") = arg5, d4 asm("d4") = arg6, d5 asm("d5") = arg7;
+    asm volatile("trap #0\n\t"
+                 : "+r"(d0), "+r"(d1), "+r"(a0), "+r"(a1)
+                 : "r"(d0), "r"(d1), "r"(a0), "r"(a1), "r"(d2), "r"(d3), "r"(d4), "r"(d5)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)((d0 & 0xFFFFFFFF) | ((uint64_t)d1 << 32));
+    ret.value = ((a0 & 0xFFFFFFFF) | ((uint64_t)a1 << 32));
+    return ret;
+}
+
 #else
 #error "Unsupported architecture"
 #endif

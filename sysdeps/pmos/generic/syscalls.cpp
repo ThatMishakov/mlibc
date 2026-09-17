@@ -8,7 +8,7 @@
 
 // TODO: This should probably be a separate library
 
-#ifdef __i386__
+#if defined(__i386__) || defined(__m68k__)
 #define __32BITSYSCALL
 #endif
 
@@ -315,7 +315,7 @@ result_t delete_receive_right(pmos_port_t port, pmos_right_t right, unsigned fla
     if (!port || !right)
         return SUCCESS;
 
-    #ifdef __i386__
+    #ifdef __32BITSYSCALL
     return syscall32_4(SYSCALL_DELETE_RECEIVE_RIGHT | (flags << 8), (uint32_t)port, port >> 32, (uint32_t)right, right >> 32).result;
     #else
     return syscall2(SYSCALL_DELETE_RECEIVE_RIGHT | (flags << 8), port, right).result;
