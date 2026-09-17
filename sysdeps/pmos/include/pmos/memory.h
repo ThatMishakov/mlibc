@@ -286,6 +286,9 @@ result_t pmos_set_registers(uint64_t pid, unsigned register_set, void *addr);
  */
 result_t get_registers(uint64_t pid, unsigned register_set, void *addr);
 
+result_t pmos_set_tcb(void *tcb);
+void *pmos_get_tcb();
+
     #define PAGE_TABLE_SELF 0
 
     #define PAGE_TABLE_CREATE 1

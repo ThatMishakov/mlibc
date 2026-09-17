@@ -631,4 +631,22 @@ right_restrict_result_t restrict_right(pmos_right_t right, uint32_t mask)
     };
 }
 
+result_t pmos_set_tcb(void *tcb)
+{
+#ifdef __32BITSYSCALL
+    return syscall32_1(SYSCALL_SET_TCB, (unsigned)tcb).result;
+#else
+    return syscall1(SYSCALL_SET_TCB, reinterpret_cast<uintptr_t>(tcb)).result;
+#endif
+}
+
+void *pmos_get_tcb()
+{
+#ifdef __32BITSYSCALL
+    return (void *)syscall32_0(SYSCALL_GET_TCB).value;
+#else
+    return (void *)syscall0(SYSCALL_GET_TCB).value;
+#endif
+}
+
 } // extern "C"
