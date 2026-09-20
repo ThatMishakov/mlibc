@@ -1725,7 +1725,7 @@ typedef struct IPC_Start_Service {
     uint32_t flags;
 
     /// cmdline string (gets parsed into arguments)
-    char cmdline[];
+    char cmdline[0];
 } IPC_Start_Service;
 
 #define IPC_Start_Service_Result_NUM 0x1f0

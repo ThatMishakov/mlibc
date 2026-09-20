@@ -43,7 +43,7 @@
 #define NO_CPU      0
 #define CURRENT_CPU (uint64_t)(-1)
 
-typedef uint64_t result_t;
+typedef int64_t result_t;
 typedef uint64_t pmos_port_t;
 typedef uint64_t pmos_right_t;
 typedef uint64_t mem_object_t;
