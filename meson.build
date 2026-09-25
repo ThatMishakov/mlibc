@@ -68,13 +68,7 @@ if not headers_only
 	endif
 
 	ifunc_check = '''
-	void my_func_impl() {}
-
-	extern "C" void (*resolver())() {
-		return my_func_impl;
-	}
-
-	void my_func() __attribute__((ifunc("resolver")));
+	static_assert(__has_attribute(ifunc), "C++ compiler does not support ifunc");
 
 	int main() {
 		return 0;
