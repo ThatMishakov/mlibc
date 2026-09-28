@@ -158,6 +158,9 @@ void pthread_cleanup_pop(int __execute);
 int pthread_setname_np(pthread_t __thrd, const char *__name);
 int pthread_getname_np(pthread_t __thrd, char *__name, size_t __size);
 
+void pthread_set_name_np(pthread_t __thrd, const char *__name);
+void pthread_get_name_np(pthread_t __thrd, char *__name, size_t __size);
+
 int pthread_attr_setstack(pthread_attr_t *__attr, void *__stackaddr, size_t __stacksize);
 int pthread_attr_getstack(const pthread_attr_t *, void **__stackaddr, size_t *__stacksize);
 

@@ -484,6 +484,16 @@ int pthread_getname_np(pthread_t thread, char *name, size_t size) {
 	return mlibc::sysdep_or_enosys<ThreadGetname>(tcb, name, size);
 }
 
+void pthread_set_name_np(pthread_t thread, const char *name) {
+	auto tcb = reinterpret_cast<Tcb*>(thread);
+	mlibc::sysdep_or_enosys<ThreadSetname>(tcb, name);
+}
+
+void pthread_get_name_np(pthread_t thread, char *name, size_t size) {
+	auto tcb = reinterpret_cast<Tcb*>(thread);
+	mlibc::sysdep_or_enosys<ThreadGetname>(tcb, name, size);
+}
+
 int pthread_setschedparam(pthread_t thread, int policy, const struct sched_param *param) {
 	auto tcb = reinterpret_cast<Tcb*>(thread);
 	return mlibc::sysdep_or_enosys<SetSchedparam>(tcb, policy, param);
