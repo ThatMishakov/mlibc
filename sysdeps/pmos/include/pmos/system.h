@@ -83,6 +83,11 @@ syscall_r pmos_syscall(uint64_t call_n, ...);
  */
 uint64_t get_task_id();
 
+/// Use (inherit) current process
+#define PROCESS_RIGHT_SELF (uint64_t)0
+/// Create new process
+#define PROCESS_RIGHT_NEW (uint64_t)-1
+
 /**
  * @brief Creates a new process
  *
@@ -90,11 +95,12 @@ uint64_t get_task_id();
  * UNINITED state and returns its PID. To start the execution, one must load the page table with the
  * create_region* calls and running start_process() syscall.
  *
+ * @param process_right Right to the process. Also takes PROCESS_RIGHT_SELF and PROCESS_RIGHT_NEW
  * @return syscall_r structure containing the result and the PID of the new process. If the result
  * != SUCCESS, value does not hold a meaningful data.
  * @see start_process();
  */
-syscall_r syscall_new_process();
+syscall_r syscall_new_task(uint64_t process_right);
 
 /**
  * @brief Kills the task
@@ -118,9 +124,9 @@ result_t syscall_kill_task(uint64_t tid);
  * @param arg2 Second argument to the entry point. On x86_64, it is passed in the RSI register.
  * @param arg3 Third argument to the entry point. On x86_64, it is passed in the RDX register.
  * @return result_t Result of the call. If the result != SUCCESS, the process was not started.
- * @see init_stack() syscall_new_process() assign_page_table()
+ * @see init_stack() syscall_new_task() assign_page_table()
  */
-result_t syscall_start_process(uint64_t pid, unsigned long entry, unsigned long arg1,
+result_t syscall_start_task(uint64_t pid, unsigned long entry, unsigned long arg1,
                                unsigned long arg2, unsigned long arg3);
 
 /**

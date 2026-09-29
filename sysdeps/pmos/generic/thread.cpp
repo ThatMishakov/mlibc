@@ -57,7 +57,7 @@ int Sysdeps<PrepareStack>::operator()(
 
 int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
     (void)tcb;
-    auto r = syscall_new_process();
+    auto r = syscall_new_task(PROCESS_RIGHT_SELF);
     if (r.result != SUCCESS)
         return kernel_to_errno(r.result);
 
@@ -78,7 +78,7 @@ int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
     if (stack_result.result != SUCCESS)
         return kernel_to_errno(stack_result.result);
 
-    auto start_result = syscall_start_process(r.value, (unsigned long)__mlibc_thread_entry, 0, 0, 0);
+    auto start_result = syscall_start_task(r.value, (unsigned long)__mlibc_thread_entry, 0, 0, 0);
     if (start_result != SUCCESS)
         return kernel_to_errno(start_result);
 
