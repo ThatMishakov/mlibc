@@ -410,7 +410,7 @@ syscall_r init_stack(uint64_t tid, uint64_t stack_top)
 #endif
 }
 
-result_t syscall_start_process(uint64_t pid, unsigned long entry, unsigned long arg1,
+result_t syscall_start_task(uint64_t pid, unsigned long entry, unsigned long arg1,
                                unsigned long arg2, unsigned long arg3)
 {
 #ifdef __32BITSYSCALL
@@ -420,12 +420,12 @@ result_t syscall_start_process(uint64_t pid, unsigned long entry, unsigned long 
 #endif
 }
 
-syscall_r syscall_new_process()
+syscall_r syscall_new_task(uint64_t right)
 {
 #ifdef __32BITSYSCALL
-    return syscall32_0(SYSCALL_CREATE_PROCESS);
+    return syscall32_2(SYSCALL_CREATE_PROCESS, (uint32_t)right, right >> 32);
 #else
-    return syscall0(SYSCALL_CREATE_PROCESS);
+    return syscall1(SYSCALL_CREATE_PROCESS, right);
 #endif
 }
 
