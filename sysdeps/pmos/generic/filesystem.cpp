@@ -4,7 +4,6 @@
 
 #include <frg/array.hpp>
 #include <frg/scope_exit.hpp>
-#include <frg/eternal.hpp>
 #include <frg/vector.hpp>
 #include <frg/expected.hpp>
 
@@ -27,51 +26,7 @@
         __builtin_unreachable();                                                                   \
 })
 
-namespace {
-
-unsigned flags_to_io(unsigned fd_flags) {
-    unsigned io_flags = 0;
-    if (fd_flags & O_APPEND)
-        io_flags |= IPC_FLAG_IO_OP_APPEND;
-    if (fd_flags & O_NONBLOCK)
-        io_flags |= IPC_FLAG_IO_OP_NONBLOCK;
-    return io_flags;
-}
-
-}
-
 namespace mlibc::pmos {
-
-struct RightWrapper {
-    pmos_right_t right = INVALID_RIGHT;
-    ~RightWrapper() {
-        if (right != INVALID_RIGHT)
-            delete_right(right);
-    }
-
-    RightWrapper() = default;
-    RightWrapper(pmos_right_t r) : right(r) {}
-    RightWrapper(RightWrapper &&other) : right(other.right) {
-        other.right = INVALID_RIGHT;
-    }
-    RightWrapper &operator=(RightWrapper &&other) {
-        if (this != &other) {
-            if (right != INVALID_RIGHT)
-                delete_right(right);
-            right = other.right;
-            other.right = INVALID_RIGHT;
-        }
-        return *this;
-    }
-    RightWrapper(const RightWrapper &) = delete;
-    RightWrapper &operator=(const RightWrapper &) = delete;
-};
-
-struct OpenFile {
-    pmos_right_t io_right;
-    pmos_right_t op_right;
-    unsigned flags;
-};
 
 // constexpr unsigned FLAG_ISATTY = 0x01;
 
@@ -159,7 +114,6 @@ __attribute__((constructor(49))) void init_sysdeps() {
 #else
 
 extern FutexLock filesystem_mutex;
-// Don't bother freeing this, notably this is needed for ld.so
 extern frg::array<OpenFile, __MLIBC_OPEN_MAX> open_files;
 
 #endif
