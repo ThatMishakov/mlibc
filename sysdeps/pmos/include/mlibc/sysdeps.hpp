@@ -33,7 +33,12 @@ struct PmosSysdepTags :
 	Poll,
 	Ppoll,
 	Sigaction,
-	Openpty
+	Openpty,
+	Openpt,
+	Unlockpt,
+	Sysconf,
+	Ptsname,
+	Ttyname
 {};
 
 template<typename Tag>

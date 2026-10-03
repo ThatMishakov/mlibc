@@ -87,6 +87,17 @@ int Sysdeps<FutexWait>::operator()(int *pointer, int expected, const struct time
     return kernel_to_errno(result);
 }
 
+int Sysdeps<Sysconf>::operator()(int num, long *rret) {
+    switch (num) {
+        case _SC_TTY_NAME_MAX:
+            *rret = 32;
+            return 0;
+        default:
+            mlibc::infoLogger() << "\e[31mmlibc: sysconf() call is not implemented, number: " << num << "\e[39m" << frg::endlog;
+            return ENOSYS;
+    }
+}
+
 }
 
 #ifdef __m68k__
