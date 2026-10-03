@@ -1034,6 +1034,61 @@ typedef struct IPC_Pipe_Open_Reply {
     // On success, right 0 is read right, right 1 is write right
 } IPC_Pipe_Open_Reply;
 
+#define IPC_Openpt_NUM 0xE2
+// This replies with IPC_Open_Reply
+typedef struct IPC_Openpt {
+    /// Message type (must be IPC_Openpt_NUM)
+    uint32_t type;
+
+    /// Flags (as passed by the posix_openpt() call)
+    uint32_t flags;
+} IPC_Openpt;
+
+#define IPC_Unlockpt_NUM 0xE3
+typedef struct IPC_Unlockpt {
+    /// Message type (must be IPC_Unlockpt_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+} IPC_Unlockpt;
+
+#define IPC_Unlockpt_Reply_NUM 0xE4
+typedef struct IPC_Unlockpt_Reply {
+    /// Message type (must be IPC_Unlockpt_Reply_NUM)
+    uint32_t type;
+
+    /// Result code indicating the outcome of the unlock operation
+    int16_t result_code;
+
+    /// Flags
+    uint16_t flags;
+} IPC_Unlockpt_Reply;
+
+#define IPC_Ttyname_NUM 0xE5
+typedef struct IPC_Ttyname {
+    /// Message type (must be IPC_Ttyname_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+} IPC_Ttyname;
+
+#define IPC_Ttyname_Reply_NUM 0xE6
+typedef struct IPC_Ttyname_Reply {
+    /// Message type (must be IPC_Ttyname_Reply_NUM)
+    uint32_t type;
+
+    /// Result code indicating the outcome of the operation
+    int16_t result_code;
+
+    /// Flags
+    uint16_t flags;
+
+    /// TTY name
+    char tty_name[0];
+} IPC_Ttyname_Reply;
+
 #define IPC_Disk_Register_NUM 0xF0
 // Disks are identified by task group ID and disk ID pair
 typedef struct IPC_Disk_Register {
