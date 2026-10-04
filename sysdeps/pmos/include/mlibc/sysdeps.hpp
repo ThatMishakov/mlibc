@@ -39,7 +39,8 @@ struct PmosSysdepTags :
 	Sysconf,
 	Ptsname,
 	Ttyname,
-	Fork
+	Fork,
+	SetSid
 {};
 
 template<typename Tag>

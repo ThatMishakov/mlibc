@@ -346,6 +346,8 @@ int Sysdeps<Fork>::operator()(pid_t *child_pid) {
         return kernel_to_errno(clone_result.result);
 
     if (clone_result.value == 0) {
+        delete_task_group.release();
+
         // Child process
         __posix_server_right = new_posix_right;
         __process_task_group = rr.value;
@@ -353,10 +355,48 @@ int Sysdeps<Fork>::operator()(pid_t *child_pid) {
         *child_pid = 0;
         auto set_result = set_namespace(__process_task_group, NAMESPACE_RIGHTS);
         __ensure(set_result.result == SUCCESS);
+
+        auto tcb = mlibc::get_current_tcb();
+        tcb->sysdepData.threadPort = INVALID_PORT;
+
         return 0;
     } else {
         return 0;
     }
+}
+
+int Sysdeps<SetSid>::operator()(pid_t *out) {
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    IPC_Setsid message = {
+        .type = IPC_Setsid_NUM,
+        .flags = 0,
+    };
+    auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Setsid_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Setsid_Reply_NUM)
+        return EIO;
+
+    if (reply.result_sid < 0)
+        return -reply.result_sid;
+
+    *out = reply.result_sid;
+    return 0;
 }
 
 } // namespace mlibc

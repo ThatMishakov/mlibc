@@ -113,7 +113,7 @@ libc_sources += files(
 	'generic/syscalls.cpp',
 	'generic/helpers.cpp',
 	'generic/filesystem.cpp',
-	'generic/filesystem2.cpp',
+	'generic/posix.cpp',
 	'generic/thread.cpp',
 	'generic/signal.cpp',
 
