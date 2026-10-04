@@ -207,11 +207,11 @@ int Sysdeps<Ttyname>::operator()(int fd, char *buff, size_t size) {
         return -reply->result_code;
 
     size_t name_length = reply_descr.size - sizeof(IPC_Ttyname_Reply);
-    if (name_length - 1 > size)
+    if (name_length + 1 > size)
         return ERANGE;
 
     memcpy(buff, reply->tty_name, name_length);
-    buff[name_length - 1] = '\0';
+    buff[name_length] = '\0';
 
     return 0;
 }
