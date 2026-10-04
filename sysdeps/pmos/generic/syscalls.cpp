@@ -649,4 +649,13 @@ void *pmos_get_tcb()
 #endif
 }
 
+syscall_r pmos_clone(uint64_t task_id)
+{
+#ifdef __32BITSYSCALL
+    return syscall32_2(SYSCALL_CLONE, (uint32_t)task_id, task_id >> 32);
+#else
+    return syscall1(SYSCALL_CLONE, task_id);
+#endif
+}
+
 } // extern "C"

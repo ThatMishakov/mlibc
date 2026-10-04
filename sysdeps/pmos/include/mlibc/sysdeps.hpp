@@ -38,7 +38,8 @@ struct PmosSysdepTags :
 	Unlockpt,
 	Sysconf,
 	Ptsname,
-	Ttyname
+	Ttyname,
+	Fork
 {};
 
 template<typename Tag>

@@ -216,4 +216,147 @@ int Sysdeps<Ttyname>::operator()(int fd, char *buff, size_t size) {
     return 0;
 }
 
+static int create_new_process(pid_t *child_pid, pmos_right_t *child_right) {
+    IPC_Register_Process message = {
+        .type = IPC_Register_Process_NUM,
+        .flags = 0,
+    };
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    pmos_right_t extra_rights[4] = {};
+    auto get_result = accept_rights(port, extra_rights);
+    __ensure(get_result == SUCCESS);
+    frg::scope_exit delete_rights([&] {
+        for (size_t i = 0; i < 4; ++i) {
+            if (extra_rights[i] != INVALID_RIGHT) {
+                delete_right(extra_rights[i]);
+            }
+        }
+    });
+
+    IPC_Register_Process_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Register_Process_Reply_NUM)
+        return EIO;
+
+    if (reply.result < 0)
+        return -reply.result;
+
+    *child_pid = reply.pid;
+    *child_right = extra_rights[0];
+    if (*child_right == INVALID_RIGHT)
+        return EIO;
+    
+    extra_rights[0] = INVALID_RIGHT;
+
+    return 0;
+}
+
+static int copy_open_files(frg::array<OpenFile, __MLIBC_OPEN_MAX> &open_files_copy, uint64_t task_group_id) {
+    frg::unique_lock lock(filesystem_mutex);
+    for (unsigned i = 0; i < __MLIBC_OPEN_MAX; ++i) {
+        if (open_files[i].io_right != INVALID_RIGHT) {
+            pmos_right_t io_right = -1, op_right = -1;
+            
+            auto result = dup_right(open_files[i].op_right);
+            if (result.result != SUCCESS)
+                return kernel_to_errno(result.result);
+            
+            auto transfer_result = transfer_right(task_group_id, result.right, 0);
+            if (transfer_result.result != SUCCESS) {
+                delete_right(result.right);
+                return kernel_to_errno(transfer_result.result);
+            }
+            op_right = transfer_result.right;
+
+            result = dup_right(open_files[i].io_right);
+            if (result.result != SUCCESS)
+                return kernel_to_errno(result.result);
+            transfer_result = transfer_right(task_group_id, result.right, 0);
+            if (transfer_result.result != SUCCESS) {
+                delete_right(result.right);
+                return kernel_to_errno(transfer_result.result);
+            }
+            io_right = transfer_result.right;
+
+
+            open_files_copy[i].io_right = io_right;
+            open_files_copy[i].op_right = op_right;
+            open_files_copy[i].flags = open_files[i].flags;
+        }
+    }
+
+    return 0;
+}
+
+int Sysdeps<Fork>::operator()(pid_t *child_pid) {
+    pmos_right_t child_right;
+    syscall_r r = syscall_new_task(PROCESS_RIGHT_NEW);
+    if (r.result != SUCCESS)
+        return kernel_to_errno(r.result);
+    // TODO: Make this return the right...
+
+    auto result = create_new_process(child_pid, &child_right);
+    if (result)
+        return result;
+    frg::scope_exit delete_child_right([&] {
+        delete_right(child_right);
+    });
+
+    syscall_r rr = create_task_group();
+    if (rr.result != SUCCESS)
+        return kernel_to_errno(rr.result);
+    frg::scope_exit delete_task_group([&] {
+        remove_task_from_group(TASK_ID_SELF, rr.value);
+    });
+
+    auto add_result = add_task_to_group(r.value, rr.value);
+    if (add_result != SUCCESS)
+        return kernel_to_errno(add_result);
+
+    auto transfer_result = transfer_right(rr.value, child_right, 0);
+    if (transfer_result.result != SUCCESS)
+        return kernel_to_errno(transfer_result.result);
+    pmos_right_t new_posix_right = transfer_result.right;
+    delete_child_right.release();
+
+    frg::array<OpenFile, __MLIBC_OPEN_MAX> open_files_copy;
+    int copy_result = copy_open_files(open_files_copy, rr.value);
+    if (copy_result)
+        return copy_result;
+
+    auto clone_result = pmos_clone(r.value);
+    if (clone_result.result != SUCCESS)
+        return kernel_to_errno(clone_result.result);
+
+    if (clone_result.value == 0) {
+        // Child process
+        __posix_server_right = new_posix_right;
+        __process_task_group = rr.value;
+        open_files = std::move(open_files_copy);
+        *child_pid = 0;
+        auto set_result = set_namespace(__process_task_group, NAMESPACE_RIGHTS);
+        __ensure(set_result.result == SUCCESS);
+        return 0;
+    } else {
+        return 0;
+    }
+}
+
 } // namespace mlibc
