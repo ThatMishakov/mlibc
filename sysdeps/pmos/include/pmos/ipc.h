@@ -1462,14 +1462,11 @@ typedef struct IPC_Set_Process_Group {
     /// Flags
     uint32_t flags;
 
-    /// Port for the reply
-    pmos_port_t reply_port;
-
     /// PID (accepts 0)
-    int64_t pid;
+    int32_t pid;
 
     /// Process group ID (if 0, the same as the PID is used)
-    int64_t pgid;
+    int32_t pgid;
 } IPC_Set_Process_Group;
 
 #define IPC_Set_Process_Group_Reply_NUM 0x185
@@ -1481,10 +1478,10 @@ typedef struct IPC_Set_Process_Group_Reply {
     uint32_t flags;
 
     /// Result code
-    int64_t result;
+    int32_t result;
 
     /// Group ID
-    int64_t group_id;
+    int32_t group_id;
 } IPC_Set_Process_Group_Reply;
 
 #define IPC_Kill_NUM 0x186
@@ -1550,84 +1547,7 @@ typedef struct IPC_Raise_Signal_Reply {
     int64_t result;
 } IPC_Raise_Signal_Reply;
 
-#define IPC_Preregister_Process_NUM 0x18a
-typedef struct IPC_Preregister_Process {
-    /// Message type (must be IPC_Register_Process_NUM)
-    uint32_t type;
-
-    /// Flags
-    uint32_t flags;
-
-    /// Worker task ID of the new process
-    uint64_t worker_task_id;
-
-    /// PID of the parrent (0 for self)
-    int64_t parent_pid;
-} IPC_Preregister_Process;
-
-#define IPC_Preregister_Process_Reply_NUM 0x18b
-typedef struct IPC_Preregister_Process_Reply {
-    /// Message type (must be IPC_Register_Process_Reply_NUM)
-    uint32_t type;
-
-    /// Flags
-    uint32_t flags;
-
-    /// Result code (if negative) or PID (if positive)
-    int64_t result;
-} IPC_Preregister_Process_Reply;
-
-#define IPC_Sigaction_NUM 0x18c
-typedef struct IPC_Sigaction {
-    /// Message type (must be IPC_Sigaction_NUM)
-    uint32_t type;
-
-#define SIGACTION_FLAG_SET 0x01
-
-    /// Flags
-    uint32_t flags;
-
-    /// Signal number
-    uint32_t sigval;
-
-    /// Sigaction flags
-    uint32_t sa_flags;
-
-    /// Handler function
-    uint64_t sa_handler_;
-
-    /// Restorer function
-    uint64_t sa_restorer;
-
-    /// Signal mask
-    uint64_t sa_mask;
-} IPC_Sigaction;
-
-#define IPC_Sigaction_Reply_NUM 0x18d
-typedef struct IPC_Sigaction_Reply {
-    /// Message type (must be IPC_Sigaction_Reply_NUM)
-    uint32_t type;
-
-    /// Flags
-    uint32_t flags;
-
-    /// Result code
-    int32_t result;
-
-    /// Old flags
-    uint32_t old_sa_flags;
-
-    /// Old handler function
-    uint64_t old_sa_handler;
-
-    /// Old restorer function
-    uint64_t old_sa_restorer;
-
-    /// Old signal mask
-    uint64_t old_sa_mask;
-} IPC_Sigaction_Reply;
-
-#define IPC_Request_Right_Reply_NUM 0x18d
+#define IPC_Request_Right_Reply_NUM 0x18a
 typedef struct IPC_Request_Right_Reply {
     /// Message type (must be IPC_Get_Right_Reply_NUM)
     uint32_t type;
@@ -1638,6 +1558,27 @@ typedef struct IPC_Request_Right_Reply {
     /// Result (-errno)
     int64_t result;
 } IPC_Request_Right_Reply;
+
+#define IPC_Setsid_NUM 0x18b
+typedef struct IPC_Setsid {
+    /// Message type (must be IPC_Setsid_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+} IPC_Setsid;
+
+#define IPC_Setsid_Reply_NUM 0x190
+typedef struct IPC_Setsid_Reply {
+    /// Message type (must be IPC_Setsid_Reply_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+
+    /// Result if negative, sid if positive (the new session leader)
+    int32_t result_sid;
+} IPC_Setsid_Reply;
 
 struct IPC_Object_Property {
     // Also aligned to 8 I guess...
