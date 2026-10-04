@@ -129,6 +129,16 @@ result_t syscall_kill_task(uint64_t tid);
 result_t syscall_start_task(uint64_t pid, unsigned long entry, unsigned long arg1,
                                unsigned long arg2, unsigned long arg3);
 
+/// @brief Clones the current task's state to the task at task_id, and starts it.
+///
+/// This works as a shorthand for assign_page_table(), copying all the registers, and
+/// syscall_start_task() with the same entry point and arguments as the current task.
+/// The caller gets 1 as return value, and the new task gets 0.
+///
+/// @param task_id ID of the task to clone to. Must be uninitialized and have no page table assigned.
+/// @return 1 for the caller, 0 for the new task
+syscall_r pmos_clone(uint64_t task_id);
+
 /**
  * @brief Loads an executable from the memory object into the address space of a task
  *
