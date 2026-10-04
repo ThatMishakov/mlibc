@@ -381,8 +381,49 @@ int Sysdeps<Recvfrom>::operator()(int , void *, size_t , int , struct sockaddr *
     STUB();
 }
 
-int Sysdeps<Dup2>::operator()(int , int , int) {
-    STUB();
+int Sysdeps<Dup2>::operator()(int fd, int flags, int newfd) {
+    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+        return EBADF;
+    if (newfd >= __MLIBC_OPEN_MAX || newfd < 0)
+        return EBADF;
+
+    pmos_right_t io_right, op_right;
+    unsigned file_flags;
+    {
+        frg::unique_lock lock(filesystem_mutex);
+        io_right = open_files[fd].io_right;
+        op_right = open_files[fd].op_right;
+        file_flags = open_files[fd].flags;
+    }
+
+    if (io_right == INVALID_RIGHT)
+        return EBADF;
+
+    frg::unique_lock lock(filesystem_mutex);
+
+    auto io_dup_result = dup_right(io_right);
+    if (io_dup_result.result != SUCCESS)
+        return kernel_to_errno(io_dup_result.result);
+    auto op_dup_result = dup_right(op_right);
+    if (op_dup_result.result != SUCCESS) {
+        delete_right(io_dup_result.right);
+        return kernel_to_errno(op_dup_result.result);
+    }
+
+    if (open_files[newfd].io_right != INVALID_RIGHT) {
+        delete_right(open_files[newfd].io_right);
+        delete_right(open_files[newfd].op_right);
+    }
+
+    unsigned flags_norm = flags & FD_CLOEXEC ? O_CLOEXEC : 0;
+
+    open_files[newfd].io_right = io_dup_result.right;
+    open_files[newfd].op_right = op_dup_result.right;
+    open_files[newfd].flags = file_flags & (~O_CLOEXEC);
+    open_files[newfd].flags |= flags_norm;
+
+    return 0;
+    
 }
 
 int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int fd, off_t offset, void **window) {
