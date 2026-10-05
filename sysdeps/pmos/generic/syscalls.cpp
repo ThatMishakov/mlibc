@@ -301,15 +301,6 @@ syscall_r pmos_get_time(unsigned mode)
 #endif
 }
 
-result_t send_message_port(uint64_t port, size_t size, const void *message)
-{
-#ifdef __32BITSYSCALL
-    return syscall32_4(SYSCALL_SEND_MSG_PORT, (uint32_t)port, port >> 32, (uint32_t)size, (unsigned)message).result;
-#else
-    return syscall3(SYSCALL_SEND_MSG_PORT, port, size, reinterpret_cast<uintptr_t>(message)).result;
-#endif
-}
-
 result_t delete_receive_right(pmos_port_t port, pmos_right_t right, unsigned flags)
 {
     if (!port || !right)
@@ -518,6 +509,20 @@ right_request_t pmos_create_timer(pmos_port_t port)
     result = syscall32_2(SYSCALL_CREATE_TIMER, (uint32_t)port, port >> 32);
     #else
     result = syscall1(SYSCALL_CREATE_TIMER, port);
+    #endif
+    return (right_request_t) {
+        .result = static_cast<result_t>(result.result),
+        .right = result.value,
+    };
+}
+
+right_request_t process_for_task(uint64_t task_id, unsigned flags)
+{
+    syscall_r result;
+    #ifdef __32BITSYSCALL
+    result = syscall32_2(SYSCALL_PROCESS_RIGHT | (flags << 8), (uint32_t)task_id, task_id >> 32);
+    #else
+    result = syscall1(SYSCALL_PROCESS_RIGHT | (flags << 8), task_id);
     #endif
     return (right_request_t) {
         .result = static_cast<result_t>(result.result),

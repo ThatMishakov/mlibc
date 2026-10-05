@@ -202,31 +202,6 @@ result_t syscall_get_message_info(Message_Descriptor *descr, pmos_port_t port, u
 right_request_t get_first_message(char *buff, uint32_t args, pmos_port_t port);
 
 /**
- * @brief Sends the message to the port
- *
- * This system call sends the message to the specified port. The message can currently be of any
- * size and the kernel does not inspect the passed buffer in any way, though it probably is a **very
- * bad idea** to not at least define the type from IPC_Generic_Msg.
- *
- * In the current implementation, the messages are coppied to the kernel buffer and are stored in a
- * linked list of an infinite maximum size. Thus, when sending large amounts of data, it might be a
- * better idea to use shared memory or move the memory regions (read pages) around.
- *
- * @param port The destination port
- * @param object_id ID of the memory object, that is sent with the message, if it is not 0
- * @param size Size of the message in bytes.
- * @param message Message content. Currently, there are no alignment requirements.
- * @return result_t Generic result of the operation
- * @see syscall_get_message_info() get_first_message() transfer_region()
- * @todo Now that I have redone the memory system in the kernel and have (- and at least I think -)
- * cool memory-moving syscalls, it might be a good idea to provide an interface to move the pages
- * with the messages.
- */
-result_t send_message_port(pmos_port_t port, size_t size, const void *message);
-result_t send_message_port2(pmos_port_t port, mem_object_t object_id, size_t size,
-                            const void *message, unsigned flags);
-
-/**
  * @brief Chages the tasks' scheduler priority
  *
  * This system call changes the scheduler priority of the current process.
@@ -484,6 +459,12 @@ result_t delete_right_raw(pmos_right_t right_id);
 ///        the given right are cleared.
 /// @return 0 on success, -errno (typical kernel thing) on error
 result_t delete_receive_right(pmos_port_t port, pmos_right_t receive_right_id, unsigned flags);
+
+/// @brief Creates a right for the process for a given task. Only self is supported for now
+/// @param task_id ID of the task to create a process right for. Takes TASK_ID_SELF (0) for the current task.
+/// @param flags Optional flags (currently none)
+/// @return ID of the new right on success
+right_request_t process_for_task(uint64_t task_id, unsigned flags);
 
 #define RIGHT_PERMISSION_READ 0x01
 #define RIGHT_PERMISSION_WRITE 0x02
