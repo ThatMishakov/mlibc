@@ -108,5 +108,6 @@
 #define SYSCALL_RESTRICT_RIGHT              67
 #define SYSCALL_SET_TCB                     68
 #define SYSCALL_GET_TCB                     69
+#define SYSCALL_GET_PROCESS_ID              70
 
 #endif

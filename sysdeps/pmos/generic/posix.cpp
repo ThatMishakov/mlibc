@@ -216,7 +216,7 @@ int Sysdeps<Ttyname>::operator()(int fd, char *buff, size_t size) {
     return 0;
 }
 
-static int create_new_process(pid_t *child_pid, pmos_right_t *child_right) {
+static int create_new_process(uint64_t child_task_id, pid_t *child_pid, pmos_right_t *child_right) {
     IPC_Register_Process message = {
         .type = IPC_Register_Process_NUM,
         .flags = 0,
@@ -226,9 +226,18 @@ static int create_new_process(pid_t *child_pid, pmos_right_t *child_right) {
     if (port == INVALID_PORT)
         return EIO;
 
-    auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
-    if (send_result.result != SUCCESS)
+    auto process_right = process_for_task(child_task_id, 0);
+    if (process_right.result != SUCCESS)
+        return kernel_to_errno(process_right.result);
+    message_extra_t extra = {
+        .extra_rights = {process_right.right},
+    };
+
+    auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), &extra, 0);
+    if (send_result.result != SUCCESS) {
+        delete_right(process_right.right);
         return -send_result.result;
+    }
 
     Message_Descriptor reply_descr;
     auto result = syscall_get_message_info(&reply_descr, port, 0);
@@ -312,7 +321,7 @@ int Sysdeps<Fork>::operator()(pid_t *child_pid) {
         return kernel_to_errno(r.result);
     // TODO: Make this return the right...
 
-    auto result = create_new_process(child_pid, &child_right);
+    auto result = create_new_process(r.value, child_pid, &child_right);
     if (result)
         return result;
     frg::scope_exit delete_child_right([&] {
