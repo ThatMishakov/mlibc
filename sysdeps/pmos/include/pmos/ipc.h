@@ -380,6 +380,21 @@ typedef struct IPC_Poll {
     uint16_t events;
 } IPC_Poll;
 
+
+#define IPC_Ioctl_NUM 0x46
+typedef struct IPC_Ioctl {
+    /// Message type (must be IPC_Ioctl_NUM)
+    uint32_t type;
+
+    /// Flags changing the behaviour
+    uint32_t flags;
+
+    /// Ioctl request code
+    uint64_t request;
+
+    /// TODO...
+} IPC_Ioctl;
+
 #define IPC_Read_Reply_NUM 0x50
 typedef struct IPC_Read_Reply {
     /// Message type (must be IPC_Read_Reply_NUM)
@@ -443,6 +458,20 @@ typedef struct IPC_Poll_Reply {
     /// Events that occurred
     uint16_t events;
 } IPC_Poll_Reply;
+
+#define IPC_Ioctl_Reply_NUM 0x54
+typedef struct IPC_Ioctl_Reply {
+    /// Message type (must be IPC_Ioctl_Reply_NUM)
+    uint32_t type;
+
+    uint16_t flags;
+
+    int16_t result_code;
+
+    int32_t ioctl_result;
+
+    // TODO...
+} IPC_Ioctl_Reply;
 
 #define IPC_Stat_NUM 0x56
 /// Message sent by the user process to VFS daemon get file stats

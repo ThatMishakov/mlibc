@@ -116,6 +116,7 @@ libc_sources += files(
 	'generic/posix.cpp',
 	'generic/thread.cpp',
 	'generic/signal.cpp',
+    'generic/ioctl.cpp',
 
 	host_machine.cpu_family() + '/thread.S',
 )
