@@ -578,6 +578,11 @@ result_t pmos_futex_wake(int *pointer, bool all);
 
 void pmos_syscall_exit(unsigned reason, bool terminate_process);
 
+/// @brief Creates a right for the task group with the given ID. The right is a weak reference.
+/// @param task_group_id Task group ID for which the right should be created. Caller must be in the group
+/// @return Right ID on success, -errno on error
+right_request_t right_for_task_group(uint64_t task_group_id);
+
 #define PMOS_SET_TIMER_RELATIVE (1 << 0)
 
 #endif

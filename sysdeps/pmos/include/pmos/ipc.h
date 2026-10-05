@@ -563,6 +563,34 @@ typedef struct IPC_Open_Reply {
     uint16_t fs_flags;
 } IPC_Open_Reply;
 
+#define IPC_Execve_NUM 0x5a
+typedef struct IPC_Execve {
+    /// Message type (must be IPC_Execve_NUM)
+    uint32_t type;
+
+    /// Flags changing the behavior of the execve operation
+    uint32_t flags;
+
+    /// NULL-terminated path (including the terminating NULL character)
+    uint64_t path_length;
+    /// NULL-separated argv at data + path_length
+    uint64_t args_length;
+    /// NULL-separated envp at data + path_length + args_length
+    uint64_t envs_length;
+
+    char data[0];
+} IPC_Execve;
+
+#define IPC_Execve_Reply_NUM 0x5b
+// If execve is successful, the reply is not sent, and the process is replaced by the new program.
+typedef struct IPC_Execve_Reply {
+    /// Message type (must be IPC_Execve_Reply_NUM)
+    uint32_t type;
+
+    /// Result code (error) indicating the outcome of the execve operation
+    int32_t result_code;
+} IPC_Execve_Reply;
+
 #define IPC_Dup_NUM 0x5d
 typedef struct IPC_Dup {
     /// Message type (must be IPC_Dup_NUM)

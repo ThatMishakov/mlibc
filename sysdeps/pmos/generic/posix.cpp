@@ -1,11 +1,15 @@
 #include "common.hpp"
 #include <frg/scope_exit.hpp>
 #include <frg/mutex.hpp>
+#include <frg/string.hpp>
+#include <frg/vector.hpp>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <alloca.h>
+#include <mlibc/allocator.hpp>
+#include <unistd.h>
 
 using namespace mlibc::pmos;
 
@@ -406,6 +410,129 @@ int Sysdeps<SetSid>::operator()(pid_t *out) {
 
     *out = reply.result_sid;
     return 0;
+}
+
+struct OpenFileIpc {
+    pmos_right_t io_right;
+    pmos_right_t op_right;
+    uint64_t flags;
+};
+
+static int prepare_filesystem_object(pmos_right_t &new_fs_right)
+{
+    size_t page_size = getpagesize();
+    auto page_mask = page_size - 1;
+
+    auto memory_size = sizeof(OpenFileIpc) * __MLIBC_OPEN_MAX;
+    auto size_aligned = (memory_size + page_mask) & ~page_mask;
+
+    right_request_t object = create_mem_object(size_aligned, 0);
+    if (object.result != SUCCESS)
+        return kernel_to_errno(object.result);
+    frg::scope_exit delete_object([&] {
+        delete_right(object.right);
+    });
+    
+    map_mem_object_param_t map_params = {
+        .page_table_id = 0,
+        .object_right = object.right,
+        .addr_start_uint = 0,
+        .size = size_aligned,
+        .offset_object = 0,
+        .object_size = size_aligned,
+        .access_flags = PROT_READ | PROT_WRITE,
+    };
+
+    auto map_result = map_mem_object(&map_params);
+    if (map_result.result != SUCCESS)
+        return kernel_to_errno(map_result.result);
+    frg::scope_exit unmap_object([&] {
+        Sysdeps<VmUnmap>()(map_result.virt_addr, size_aligned);
+    });
+
+    frg::unique_lock lock(filesystem_mutex);
+    auto *open_files_ipc = reinterpret_cast<OpenFileIpc *>(map_result.virt_addr);
+    for (unsigned i = 0; i < __MLIBC_OPEN_MAX; ++i) {
+        open_files_ipc[i].io_right = open_files[i].io_right;
+        open_files_ipc[i].op_right = open_files[i].op_right;
+        open_files_ipc[i].flags = open_files[i].flags;
+    }
+
+    delete_object.release();
+    new_fs_right = object.right;
+    return 0;
+}
+
+int Sysdeps<Execve>::operator()(const char *path, char *const argv[], char *const envp[]) {
+	frg::string<MemoryAllocator> args_area(getAllocator());
+	for (auto it = argv; *it; ++it)
+		args_area += frg::string_view{*it, strlen(*it) + 1};
+
+	frg::string<MemoryAllocator> env_area(getAllocator());
+	for (auto it = envp; *it; ++it)
+		env_area += frg::string_view{*it, strlen(*it) + 1};
+
+    IPC_Execve message = {
+        .type = IPC_Execve_NUM,
+        .flags = 0,
+        .path_length = strlen(path) + 1,
+        .args_length = args_area.size(),
+        .envs_length = env_area.size(),
+        .data = {},
+    };
+
+    frg::vector<char, MemoryAllocator> message_data(getAllocator());
+    message_data.resize(sizeof(message) + message.path_length + message.args_length + message.envs_length);
+    auto ptr = message_data.data();
+    memcpy(ptr, &message, sizeof(message));
+    ptr += sizeof(message);
+    memcpy(ptr, path, message.path_length);
+    ptr += message.path_length;
+    memcpy(ptr, args_area.data(), message.args_length);
+    ptr += message.args_length;
+    memcpy(ptr, env_area.data(), message.envs_length);
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    pmos_right_t fs_right;
+    int prepare_result = prepare_filesystem_object(fs_right);
+    if (prepare_result)
+        return prepare_result;
+
+    right_request_t task_group_right = right_for_task_group(__process_task_group);
+    if (task_group_right.result != SUCCESS) {
+        delete_right(fs_right);
+        return kernel_to_errno(task_group_right.result);
+    }
+
+    message_extra_t extra = {
+        .extra_rights = {fs_right, task_group_right.right},
+    };
+
+    auto send_result = send_message_right(__posix_server_right, port, message_data.data(), message_data.size(), &extra, 0);
+    if (send_result.result != SUCCESS) {
+        delete_right(task_group_right.right);
+        delete_right(fs_right);
+        return -send_result.result;
+    }
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Execve_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Execve_Reply_NUM)
+        return EIO;
+
+    return -reply.result_code;
 }
 
 } // namespace mlibc

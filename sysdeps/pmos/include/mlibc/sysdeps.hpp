@@ -41,7 +41,8 @@ struct PmosSysdepTags :
 	Ttyname,
 	Fork,
 	SetSid,
-	Ioctl
+	Ioctl,
+	Execve
 {};
 
 template<typename Tag>
