@@ -672,4 +672,18 @@ syscall_r pmos_get_process_id(pmos_right_t right)
 #endif
 }
 
+right_request_t right_for_task_group(uint64_t task_group_id)
+{
+    syscall_r result;
+    #ifdef __32BITSYSCALL
+    result = syscall32_2(SYSCALL_GET_TASK_GROUP_RIGHT, (uint32_t)task_group_id, task_group_id >> 32);
+    #else
+    result = syscall1(SYSCALL_GET_TASK_GROUP_RIGHT, task_group_id);
+    #endif
+    return (right_request_t) {
+        .result = static_cast<result_t>(result.result),
+        .right = result.value,
+    };
+}
+
 } // extern "C"
