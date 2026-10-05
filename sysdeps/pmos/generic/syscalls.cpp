@@ -663,4 +663,13 @@ syscall_r pmos_clone(uint64_t task_id)
 #endif
 }
 
+syscall_r pmos_get_process_id(pmos_right_t right)
+{
+#ifdef __32BITSYSCALL
+    return syscall32_2(SYSCALL_GET_PROCESS_ID, (uint32_t)right, right >> 32);
+#else
+    return syscall1(SYSCALL_GET_PROCESS_ID, right);
+#endif
+}
+
 } // extern "C"

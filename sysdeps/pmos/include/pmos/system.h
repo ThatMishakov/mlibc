@@ -466,6 +466,11 @@ result_t delete_receive_right(pmos_port_t port, pmos_right_t receive_right_id, u
 /// @return ID of the new right on success
 right_request_t process_for_task(uint64_t task_id, unsigned flags);
 
+/// @brief Gets the process ID for the given process right
+/// @param process_right Process right to get the ID for. Also takes PROCESS_RIGHT_SELF
+/// @return On success, returns the process ID. On error, returns -errno
+syscall_r pmos_get_process_id(pmos_right_t process_right);
+
 #define RIGHT_PERMISSION_READ 0x01
 #define RIGHT_PERMISSION_WRITE 0x02
 #define RIGHT_PERMISSION_EXECUTE 0x04
