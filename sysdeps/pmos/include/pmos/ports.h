@@ -147,6 +147,7 @@ syscall_r get_right_type(pmos_right_t right);
 #define RIGHT_TYPE_INT_NOTIFICATION 5
 #define RIGHT_TYPE_TIMER            6
 #define RIGHT_TYPE_PROCESS          7
+#define RIGHT_TYPE_TASK_GROUP       8
 
 #endif
 
