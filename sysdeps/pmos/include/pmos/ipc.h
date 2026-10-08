@@ -1519,6 +1519,7 @@ typedef struct IPC_Get_ID {
     #define IPC_GET_ID_TYPE_GID 0x03
     #define IPC_GET_ID_TYPE_EUID 0x04
     #define IPC_GET_ID_TYPE_EGID 0x05
+    #define IPC_GET_ID_TYPE_PPID 0x06
 
     /// ID to request
     uint16_t id_type;
