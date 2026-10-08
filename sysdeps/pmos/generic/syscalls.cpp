@@ -686,4 +686,13 @@ right_request_t right_for_task_group(uint64_t task_group_id)
     };
 }
 
+result_t terminate_process(uint64_t task_group_id)
+{
+    #ifdef __32BITSYSCALL
+    return syscall32_2(SYSCALL_TERMINATE_PROCESS, (uint32_t)task_group_id, task_group_id >> 32).result;
+    #else
+    return syscall1(SYSCALL_TERMINATE_PROCESS, task_group_id).result;
+    #endif
+}
+
 } // extern "C"
