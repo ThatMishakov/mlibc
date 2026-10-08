@@ -42,7 +42,12 @@ struct PmosSysdepTags :
 	Fork,
 	SetSid,
 	Ioctl,
-	Execve
+	Execve,
+	GetUid,
+	GetEuid,
+	GetGid,
+	GetEgid,
+	GetPid
 {};
 
 template<typename Tag>

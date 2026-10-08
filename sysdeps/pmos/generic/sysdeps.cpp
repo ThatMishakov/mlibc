@@ -93,7 +93,6 @@ int Sysdeps<Sysconf>::operator()(int num, long *rret) {
             *rret = 32;
             return 0;
         default:
-            mlibc::infoLogger() << "\e[31mmlibc: sysconf() call is not implemented, number: " << num << "\e[39m" << frg::endlog;
             return ENOSYS;
     }
 }

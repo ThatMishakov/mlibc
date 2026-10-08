@@ -1506,128 +1506,38 @@ typedef struct IPC_Register_Process_Reply {
     int32_t pid;
 } IPC_Register_Process_Reply;
 
-#define IPC_PID_For_Task_NUM 0x182
-typedef struct IPC_PID_For_Task {
-    /// Message type (must be IPC_PID_For_Task_NUM)
+#define IPC_Get_ID_NUM 0x182
+typedef struct IPC_Get_ID {
+    /// Message type (must be IPC_Get_ID_NUM)
     uint32_t type;
 
     /// Flags
-    uint32_t flags;
-#define PID_FOR_TASK_WAIT_TO_APPEAR 0x01
-#define PID_FOR_TASK_PARENT_PID     0x02
-#define PID_FOR_TASK_GROUP_ID       0x04
+    uint16_t flags;
 
-    /// Task ID (takes TASK_ID_SELF)
-    uint64_t task_id;
-} IPC_PID_For_Task;
+    #define IPC_GET_ID_TYPE_PID 0x01
+    #define IPC_GET_ID_TYPE_UID 0x02
+    #define IPC_GET_ID_TYPE_GID 0x03
+    #define IPC_GET_ID_TYPE_EUID 0x04
+    #define IPC_GET_ID_TYPE_EGID 0x05
 
-#define IPC_PID_For_Task_Reply_NUM 0x183
-typedef struct IPC_PID_For_Task_Reply {
-    /// Message type (must be IPC_PID_For_Task_Reply_NUM)
+    /// ID to request
+    uint16_t id_type;
+} IPC_Get_ID;
+
+#define IPC_Get_ID_Reply_NUM 0x183
+typedef struct IPC_Get_ID_Reply {
+    /// Message type (must be IPC_Get_ID_Reply_NUM)
     uint32_t type;
 
     /// Flags
-    uint32_t flags;
+    uint16_t flags;
 
     /// Result code
-    int64_t result;
+    int16_t result;
 
-    /// PID
-    int64_t pid;
-} IPC_PID_For_Task_Reply;
-
-#define IPC_Set_Process_Group_NUM 0x184
-typedef struct IPC_Set_Process_Group {
-    /// Message type (must be IPC_Set_Process_Group_NUM)
-    uint32_t type;
-
-    /// Flags
-    uint32_t flags;
-
-    /// PID (accepts 0)
-    int32_t pid;
-
-    /// Process group ID (if 0, the same as the PID is used)
-    int32_t pgid;
-} IPC_Set_Process_Group;
-
-#define IPC_Set_Process_Group_Reply_NUM 0x185
-typedef struct IPC_Set_Process_Group_Reply {
-    /// Message type (must be IPC_Set_Process_Group_Reply_NUM)
-    uint32_t type;
-
-    /// Flags
-    uint32_t flags;
-
-    /// Result code
-    int32_t result;
-
-    /// Group ID
-    int32_t group_id;
-} IPC_Set_Process_Group_Reply;
-
-#define IPC_Kill_NUM 0x186
-typedef struct IPC_Kill {
-    /// Message type (must be IPC_Kill_NUM)
-    uint32_t type;
-
-    /// Flags
-    uint32_t flags;
-
-    /// Port for the reply
-    pmos_port_t reply_port;
-
-    /// PID
-    int64_t pid;
-
-    /// Signal
-    int64_t signal;
-} IPC_Kill;
-
-#define IPC_Kill_Reply_NUM 0x187
-typedef struct IPC_Kill_Reply {
-    /// Message type (must be IPC_Kill_Reply_NUM)
-    uint32_t type;
-
-    /// Flags
-    uint32_t flags;
-
-    /// Result code
-    int64_t result;
-} IPC_Kill_Reply;
-
-// Message sent to the signal thread (either with raise() or from the processd
-// server) to raise a signal, either globally or to a specific thread
-#define IPC_Raise_Signal_NUM 0x188
-typedef struct IPC_Raise_Signal {
-    /// Message type (must be IPC_Raise_Signal_NUM)
-    uint32_t type;
-
-    /// Flags
-    uint32_t flags;
-#define RAISE_SIGNAL_DONT_REPLY 0x01
-
-    /// Port for the reply
-    pmos_port_t reply_port;
-
-    /// Signal number
-    int64_t signal;
-
-    /// TID
-    int64_t tid;
-} IPC_Raise_Signal;
-
-#define IPC_Raise_Signal_Reply_NUM 0x189
-typedef struct IPC_Raise_Signal_Reply {
-    /// Message type (must be IPC_Raise_Signal_Reply_NUM)
-    uint32_t type;
-
-    /// Flags
-    uint32_t flags;
-
-    /// Result code
-    int64_t result;
-} IPC_Raise_Signal_Reply;
+    /// ID value
+    uint32_t id;
+} IPC_Get_ID_Reply;
 
 #define IPC_Request_Right_Reply_NUM 0x18a
 typedef struct IPC_Request_Right_Reply {

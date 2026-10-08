@@ -535,4 +535,48 @@ int Sysdeps<Execve>::operator()(const char *path, char *const argv[], char *cons
     return -reply.result_code;
 }
 
+static uint32_t get_id_generic(uint16_t id_type) {
+    IPC_Get_ID message = {
+        .type = IPC_Get_ID_NUM,
+        .flags = 0,
+        .id_type = id_type,
+    };
+
+    auto port = __pmos_prepare_reply_port();
+    __ensure(port != INVALID_PORT);
+
+    auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
+    __ensure(send_result.result == SUCCESS);
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Get_ID_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    __ensure(reply_descr.size >= sizeof(IPC_Generic_Msg));
+    __ensure(reply.type == IPC_Get_ID_Reply_NUM);
+
+    __ensure(reply.result == 0);
+    return reply.id;
+}
+
+uid_t Sysdeps<GetUid>::operator()() {
+    return get_id_generic(IPC_GET_ID_TYPE_UID);
+}
+uid_t Sysdeps<GetEuid>::operator()() {
+    return get_id_generic(IPC_GET_ID_TYPE_EUID);
+}
+uid_t Sysdeps<GetGid>::operator()() {
+    return get_id_generic(IPC_GET_ID_TYPE_GID);
+}
+uid_t Sysdeps<GetEgid>::operator()() {
+    return get_id_generic(IPC_GET_ID_TYPE_EGID);
+}
+pid_t Sysdeps<GetPid>::operator()() {
+    return get_id_generic(IPC_GET_ID_TYPE_PID);
+}
+
 } // namespace mlibc
