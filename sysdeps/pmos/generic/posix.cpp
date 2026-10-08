@@ -339,7 +339,7 @@ int Sysdeps<Fork>::operator()(pid_t *child_pid) {
         remove_task_from_group(TASK_ID_SELF, rr.value);
     });
 
-    auto add_result = add_task_to_group(r.value, rr.value);
+    auto add_result = add_task_to_group(r.value, rr.value, 0).result;
     if (add_result != SUCCESS)
         return kernel_to_errno(add_result);
 

@@ -263,6 +263,7 @@ typedef uint64_t task_group_t;
  */
 syscall_r create_task_group();
 
+#define FLAG_GROUP_ID_IS_RIGHT 0x01
 /**
  * @brief Adds the task to the task group
  *
@@ -273,10 +274,11 @@ syscall_r create_task_group();
  *
  * @param task_id ID of the task to be added. Takes TASK_ID_SELF (0)
  * @param group_id ID of the group where the task should be added
+ * @param flags Optional flags. Takes FLAG_GROUP_ID_IS_RIGHT
  * @return result_t Result of the operation. If the result is SUCCESS, the task was added to the
- * group.
+ * group. Returns kernel group ID on success
  */
-result_t add_task_to_group(uint64_t task_id, uint64_t group_id);
+syscall_r add_task_to_group(uint64_t task_id, uint64_t group_id, unsigned flags);
 
 /**
  * @brief Removes the task from the task group

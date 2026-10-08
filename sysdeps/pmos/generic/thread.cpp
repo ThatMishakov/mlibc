@@ -66,7 +66,7 @@ int Sysdeps<Clone>::operator()(void *tcb, pid_t *pid_out, void *stack) {
         syscall_kill_task(r.value);
     }};
 
-    auto add_result = add_task_to_group(r.value, pmos::__process_task_group);
+    auto add_result = add_task_to_group(r.value, pmos::__process_task_group, 0).result;
     if (add_result != SUCCESS)
         return kernel_to_errno(add_result);
 
