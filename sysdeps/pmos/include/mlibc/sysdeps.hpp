@@ -48,6 +48,7 @@ struct PmosSysdepTags :
 	GetGid,
 	GetEgid,
 	GetPid,
+	GetPpid,
 	Pipe,
 	Dup
 {};

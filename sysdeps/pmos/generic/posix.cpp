@@ -578,6 +578,9 @@ uid_t Sysdeps<GetEgid>::operator()() {
 pid_t Sysdeps<GetPid>::operator()() {
     return get_id_generic(IPC_GET_ID_TYPE_PID);
 }
+pid_t Sysdeps<GetPpid>::operator()() {
+    return get_id_generic(IPC_GET_ID_TYPE_PPID);
+}
 
 int Sysdeps<Pipe>::operator()(int *fds, int flags) {
     IPC_Pipe_Open message = {
