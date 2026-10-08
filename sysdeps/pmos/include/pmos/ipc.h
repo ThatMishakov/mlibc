@@ -907,6 +907,19 @@ typedef struct IPC_FS_Stat_Dynamic {
     uint64_t inode;
 } IPC_FS_Stat_Dynamic;
 
+#define IPC_FS_Readlink_NUM 0xC8
+/// Message sent by the VFS daemon to a filesystem driver to read the target of a symbolic link
+typedef struct IPC_FS_Readlink {
+    /// Message type (must be IPC_FS_Readlink_NUM)
+    uint32_t type;
+
+    /// Flags changing the behaviour
+    uint32_t flags;
+
+    /// Inode of the symbolic link
+    uint64_t inode;
+} IPC_FS_Readlink;
+
 #define IPC_FS_Open_Reply_NUM 0xD0
 typedef struct IPC_FS_Open_Reply {
     /// Message type (must be IPC_FS_OPEN_REPLY_NUM)
@@ -1067,6 +1080,18 @@ typedef struct IPC_FS_Stat_Dynamic_Reply {
     /// Number of blocks allocated
     uint64_t st_blocks;
 } IPC_FS_Stat_Dynamic_Reply;
+
+#define IPC_FS_Readlink_Reply_NUM 0xDA
+typedef struct IPC_FS_Readlink_Reply {
+    /// Message type (must be IPC_FS_Readlink_Reply_NUM)
+    uint32_t type;
+
+    /// Result code indicating the outcome of the operation
+    int32_t result_code;
+
+    /// Link target path
+    char path[0];
+} IPC_FS_Readlink_Reply;
 
 #define IPC_Pipe_Open_NUM 0xE0
 typedef struct IPC_Pipe_Open {
