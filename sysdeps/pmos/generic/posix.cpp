@@ -579,4 +579,123 @@ pid_t Sysdeps<GetPid>::operator()() {
     return get_id_generic(IPC_GET_ID_TYPE_PID);
 }
 
+int Sysdeps<Pipe>::operator()(int *fds, int flags) {
+    IPC_Pipe_Open message = {
+        .type           = IPC_Pipe_Open_NUM,
+        .flags          = static_cast<uint32_t>(flags),
+    };
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    pmos_right_t extra_rights[4] = {};
+    auto get_result = accept_rights(port, extra_rights);
+    __ensure(get_result == SUCCESS);
+
+    frg::scope_exit delete_rights([&] {
+        for (size_t i = 0; i < 4; ++i) {
+            if (extra_rights[i] != INVALID_RIGHT) {
+                delete_right(extra_rights[i]);
+            }
+        }
+    });
+
+    IPC_Pipe_Open_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Pipe_Open_Reply_NUM)
+        return EIO;
+
+    if (reply.result_code < 0)
+        return -reply.result_code;
+
+    fds[0] = -1;
+    fds[1] = -1;
+
+    frg::unique_lock lock(filesystem_mutex);
+    for (unsigned i = 0; i < __MLIBC_OPEN_MAX; ++i) {
+        if (open_files[i].io_right == INVALID_RIGHT) {
+            open_files[i].io_right = extra_rights[0];
+            open_files[i].op_right = extra_rights[0];
+            open_files[i].flags    = reply.flags;
+            fds[0] = i;
+
+            break;
+        }
+    }
+
+    if (fds[0] == -1)
+        return EMFILE;
+
+    for (unsigned i = 0; i < __MLIBC_OPEN_MAX; ++i) {
+        if (open_files[i].io_right == INVALID_RIGHT) {
+            open_files[i].io_right = extra_rights[1];
+            open_files[i].op_right = extra_rights[1];
+            open_files[i].flags    = reply.flags;
+
+            fds[1] = i;
+
+            break;
+        }
+    }
+
+    if (fds[1] == -1) {
+        open_files[fds[0]].io_right = INVALID_RIGHT;
+        open_files[fds[0]].op_right = INVALID_RIGHT;
+        return EMFILE;
+    }
+
+    extra_rights[0] = INVALID_RIGHT;
+    extra_rights[1] = INVALID_RIGHT;
+    return 0;
+}
+
+int Sysdeps<Dup>::operator()(int fd, int flags, int *newfd) {
+    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+        return EBADF;
+
+    frg::unique_lock lock(filesystem_mutex);
+    if (open_files[fd].io_right == INVALID_RIGHT)
+        return EBADF;
+
+    for (unsigned i = 0; i < __MLIBC_OPEN_MAX; ++i) {
+        if (open_files[i].io_right == INVALID_RIGHT) {
+            auto result = dup_right(open_files[fd].io_right);
+            if (result.result != SUCCESS)
+                return kernel_to_errno(result.result);
+
+            auto op_result = dup_right(open_files[fd].op_right);
+            if (op_result.result != SUCCESS) {
+                delete_right(result.right);
+                return kernel_to_errno(op_result.result);
+            }
+
+            unsigned flags_norm = flags & FD_CLOEXEC ? O_CLOEXEC : 0;
+
+            open_files[i].io_right = result.right;
+            open_files[i].op_right = op_result.right;
+            open_files[i].flags    = open_files[fd].flags & (~O_CLOEXEC);
+            open_files[i].flags   |= flags_norm;
+
+            *newfd = i;
+            return 0;
+        }
+    }
+
+    return EMFILE;
+}
+
 } // namespace mlibc
