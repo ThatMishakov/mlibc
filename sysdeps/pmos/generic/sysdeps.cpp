@@ -70,10 +70,15 @@ void Sysdeps<LibcPanic>::operator()() {
     Sysdeps<Exit>()(1);
 }
 
+int Sysdeps<ClockGet>::operator()(int clock , time_t *seconds, long *nanoseconds) {
+    auto result = pmos_get_time(clock);
+    if (result.result != SUCCESS)
+        return kernel_to_errno(result.result);
 
+    *seconds = result.value / 1000000000;
+    *nanoseconds = result.value % 1000000000;
 
-int Sysdeps<ClockGet>::operator()(int , time_t *, long *) {
-    STUB();
+    return 0;
 }
 
 int Sysdeps<FutexWake>::operator()(int *pointer, bool all) {
