@@ -110,5 +110,6 @@
 #define SYSCALL_GET_TCB                     69
 #define SYSCALL_GET_PROCESS_ID              70
 #define SYSCALL_GET_TASK_GROUP_RIGHT        71
+#define SYSCALL_TERMINATE_PROCESS           72
 
 #endif
