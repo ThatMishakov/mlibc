@@ -438,12 +438,12 @@ syscall_r create_task_group()
 #endif
 }
 
-result_t add_task_to_group(uint64_t group, uint64_t task)
+syscall_r add_task_to_group(uint64_t group, uint64_t task, unsigned flags)
 {
 #ifdef __32BITSYSCALL
-    return syscall32_4(SYSCALL_ADD_TASK_TO_GROUP, (uint32_t)group, group >> 32, (uint32_t)task, task >> 32).result;
+    return syscall32_4(SYSCALL_ADD_TASK_TO_GROUP | (flags << 8), (uint32_t)group, group >> 32, (uint32_t)task, task >> 32);
 #else
-    return syscall2(SYSCALL_ADD_TASK_TO_GROUP, group, task).result;
+    return syscall3(SYSCALL_ADD_TASK_TO_GROUP | (flags << 8), group, task, flags);
 #endif
 }
 
