@@ -47,7 +47,9 @@ struct PmosSysdepTags :
 	GetEuid,
 	GetGid,
 	GetEgid,
-	GetPid
+	GetPid,
+	Pipe,
+	Dup
 {};
 
 template<typename Tag>
