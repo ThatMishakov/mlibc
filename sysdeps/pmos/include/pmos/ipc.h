@@ -1540,6 +1540,24 @@ typedef struct IPC_Get_ID_Reply {
     uint32_t id;
 } IPC_Get_ID_Reply;
 
+#define IPC_Get_ID_For_NUM 0x184
+// Replies with IPC_Get_ID_Reply
+typedef struct IPC_Get_ID_For {
+    /// Message type (must be IPC_Get_ID_For_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint16_t flags;
+
+    #define IPC_GET_ID_FOR_TYPE_PGID 0x01
+
+    /// ID to request
+    uint16_t id_type;
+
+    /// PID of the process to get the ID for
+    int32_t pid;
+} IPC_Get_ID_For;
+
 #define IPC_Request_Right_Reply_NUM 0x18a
 typedef struct IPC_Request_Right_Reply {
     /// Message type (must be IPC_Get_Right_Reply_NUM)
