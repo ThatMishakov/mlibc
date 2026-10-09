@@ -349,7 +349,7 @@ int Sysdeps<Fork>::operator()(pid_t *child_pid) {
     pmos_right_t new_posix_right = transfer_result.right;
     delete_child_right.release();
 
-    frg::array<OpenFile, __MLIBC_OPEN_MAX> open_files_copy;
+    frg::array<OpenFile, __MLIBC_OPEN_MAX> open_files_copy{};
     int copy_result = copy_open_files(open_files_copy, rr.value);
     if (copy_result)
         return copy_result;
@@ -699,6 +699,47 @@ int Sysdeps<Dup>::operator()(int fd, int flags, int *newfd) {
     }
 
     return EMFILE;
+}
+
+static int get_id_for_generic(uint16_t id_type, pid_t pid, pid_t *id) {
+    IPC_Get_ID_For message = {
+        .type = IPC_Get_ID_For_NUM,
+        .flags = 0,
+        .id_type = id_type,
+        .pid = pid,
+    };
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Get_ID_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Get_ID_Reply_NUM)
+        return EIO;
+
+    if (reply.result < 0)
+        return -reply.result;
+
+    *id = reply.id;
+    return 0;
+}
+
+int Sysdeps<GetPgid>::operator()(pid_t pid, pid_t *pgid) {
+    return get_id_for_generic(IPC_GET_ID_FOR_TYPE_PGID, pid, pgid);
 }
 
 } // namespace mlibc

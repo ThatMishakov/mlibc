@@ -50,7 +50,8 @@ struct PmosSysdepTags :
 	GetPid,
 	GetPpid,
 	Pipe,
-	Dup
+	Dup,
+	GetPgid
 {};
 
 template<typename Tag>
