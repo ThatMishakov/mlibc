@@ -52,7 +52,13 @@ struct PmosSysdepTags :
 	Pipe,
 	Dup,
 	GetPgid,
-	SetPgid
+	SetPgid,
+	Sigprocmask,
+	Tcgetattr,
+	Pselect,
+	Tcgetwinsize,
+	Tcsetwinsize,
+	Waitpid
 {};
 
 template<typename Tag>
@@ -64,6 +70,8 @@ struct SysdepTraits {
 
 struct PmosTcbData {
 	uint64_t threadPort;
+
+	uint64_t sigmask = 0;
 };
 
 using SysdepTcbData = PmosTcbData;
