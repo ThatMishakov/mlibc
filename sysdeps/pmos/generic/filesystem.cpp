@@ -348,7 +348,7 @@ int Sysdeps<Open>::operator()(const char *pathname, int flags, mode_t mode, int 
         if (open_files[i].io_right == INVALID_RIGHT) {
             open_files[i].io_right = extra_rights[1];
             open_files[i].op_right = extra_rights[0];
-            open_files[i].flags    = flags;
+            open_files[i].flags    = flags | reply.fs_flags;
             *fd = i;
 
             extra_rights[0] = INVALID_RIGHT;
