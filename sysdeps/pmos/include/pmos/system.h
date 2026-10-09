@@ -587,6 +587,9 @@ result_t terminate_process(pmos_right_t process_right);
 /// @return Right ID on success, -errno on error
 right_request_t right_for_task_group(uint64_t task_group_id);
 
+
+int get_fd_rights(int fd, pmos_right_t *op_right, pmos_right_t *io_right, unsigned *flags);
+
 #define PMOS_SET_TIMER_RELATIVE (1 << 0)
 
 #endif

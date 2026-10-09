@@ -742,4 +742,22 @@ int Sysdeps<GetPgid>::operator()(pid_t pid, pid_t *pgid) {
     return get_id_for_generic(IPC_GET_ID_FOR_TYPE_PGID, pid, pgid);
 }
 
+extern "C" int get_fd_rights(int fd, pmos_right_t *op_right, pmos_right_t *io_right, unsigned *flags) {
+    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+        return EBADF;
+
+    frg::unique_lock lock(filesystem_mutex);
+    if (open_files[fd].io_right == INVALID_RIGHT)
+        return EBADF;
+
+    if (op_right)
+        *op_right = open_files[fd].op_right;
+    if (io_right)
+        *io_right = open_files[fd].io_right;
+    if (flags)
+        *flags = open_files[fd].flags;
+
+    return 0;
+}
+
 } // namespace mlibc
