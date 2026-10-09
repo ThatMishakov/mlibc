@@ -1570,6 +1570,7 @@ typedef struct IPC_Request_Right_Reply {
     int64_t result;
 } IPC_Request_Right_Reply;
 
+// Replies with IPC_Setid_Reply
 #define IPC_Setsid_NUM 0x18b
 typedef struct IPC_Setsid {
     /// Message type (must be IPC_Setsid_NUM)
@@ -1579,8 +1580,24 @@ typedef struct IPC_Setsid {
     uint32_t flags;
 } IPC_Setsid;
 
-#define IPC_Setsid_Reply_NUM 0x190
-typedef struct IPC_Setsid_Reply {
+// Replies with IPC_Setid_Reply
+#define IPC_Setpgid_NUM 0x18c
+typedef struct IPC_Setpgid {
+    /// Message type (must be IPC_Setpgid_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+
+    /// PID of the process to set the PGID for
+    int32_t pid;
+
+    /// PGID to set for the process
+    int32_t pgid;
+} IPC_Setpgid;
+
+#define IPC_Setid_Reply_NUM 0x190
+typedef struct IPC_Setid_Reply {
     /// Message type (must be IPC_Setsid_Reply_NUM)
     uint32_t type;
 
@@ -1588,8 +1605,8 @@ typedef struct IPC_Setsid_Reply {
     uint32_t flags;
 
     /// Result if negative, sid if positive (the new session leader)
-    int32_t result_sid;
-} IPC_Setsid_Reply;
+    int32_t result_id;
+} IPC_Setid_Reply;
 
 struct IPC_Object_Property {
     // Also aligned to 8 I guess...

@@ -395,20 +395,55 @@ int Sysdeps<SetSid>::operator()(pid_t *out) {
     auto result = syscall_get_message_info(&reply_descr, port, 0);
     __ensure(result == SUCCESS);
 
-    IPC_Setsid_Reply reply;
+    IPC_Setid_Reply reply;
     result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
         return EIO;
 
-    if (reply.type != IPC_Setsid_Reply_NUM)
+    if (reply.type != IPC_Setid_Reply_NUM)
         return EIO;
 
-    if (reply.result_sid < 0)
-        return -reply.result_sid;
+    if (reply.result_id < 0)
+        return -reply.result_id;
 
-    *out = reply.result_sid;
+    *out = reply.result_id;
+    return 0;
+}
+
+int Sysdeps<SetPgid>::operator()(pid_t pid, pid_t pgid) {
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    IPC_Setpgid message = {
+        .type = IPC_Setpgid_NUM,
+        .flags = 0,
+        .pid = pid,
+        .pgid = pgid,
+    };
+    auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Setid_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Setid_Reply_NUM)
+        return EIO;
+
+    if (reply.result_id < 0)
+        return -reply.result_id;
+
     return 0;
 }
 
