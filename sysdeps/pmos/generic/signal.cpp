@@ -33,4 +33,32 @@ int Sysdeps<Sigaction>::operator()(int sigval, const struct sigaction *__restric
     return 0;
 }
 
+int Sysdeps<Sigprocmask>::operator()(int how, const sigset_t *__restrict set, sigset_t *__restrict oldset)
+{
+    auto tcb = mlibc::get_current_tcb();
+
+    if (oldset)
+        *oldset = tcb->sysdepData.sigmask;
+
+    // TODO?
+
+    if (set) {
+        switch (how) {
+        case SIG_BLOCK:
+            tcb->sysdepData.sigmask |= *set;
+            break;
+        case SIG_UNBLOCK:
+            tcb->sysdepData.sigmask &= ~(*set);
+            break;
+        case SIG_SETMASK:
+            tcb->sysdepData.sigmask = *set;
+            break;
+        default:
+            return EINVAL;
+        }
+    }
+
+    return 0;
+}
+
 } // namespace mlibc

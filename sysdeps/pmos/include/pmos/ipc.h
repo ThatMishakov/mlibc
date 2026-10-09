@@ -30,6 +30,8 @@
 #define _PMOS_IPC_H
 
 #include <stdint.h>
+#include <termios.h>
+#include <sys/resource.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -591,74 +593,56 @@ typedef struct IPC_Execve_Reply {
     int32_t result_code;
 } IPC_Execve_Reply;
 
-#define IPC_Dup_NUM 0x5d
-typedef struct IPC_Dup {
-    /// Message type (must be IPC_Dup_NUM)
+#define IPC_Tcgetattr_NUM 0x5d
+typedef struct IPC_Tcgetattr {
+    /// Message type (must be IPC_Tcgetattr_NUM)
     uint32_t type;
 
-    /// Flags changing the behaviour
+    /// Flags changing the behavior of the tcgetattr operation
     uint32_t flags;
+} IPC_Tcgetattr;
 
-    /// ID of the file to be duplicated
-    uint64_t file_id;
-
-    /// ID of the filesystem
-    uint64_t filesystem_id;
-
-    /// ID of the consumer that has the file currently opened
-    uint64_t fs_consumer_id;
-
-    /// ID of the consumer that will have the file opened
-    uint64_t new_consumer_id;
-
-    /// Port where the reply would be sent
-    uint64_t reply_port;
-} IPC_Dup;
-
-#define IPC_Dup_Reply_NUM 0x5e
-typedef struct IPC_Dup_Reply {
-    /// Message type (must be IPC_Dup_Reply_NUM)
+#define IPC_Tcgetattr_Reply_NUM 0x5e
+typedef struct IPC_Tcgetattr_Reply {
+    /// Message type (must be IPC_Tcgetattr_Reply_NUM)
     uint32_t type;
 
-    /// Result of the operation
+    /// Result code indicating the outcome of the tcgetattr operation
     int32_t result_code;
 
-    /// ID of the file
-    uint64_t file_id;
+    /// Termios structure containing the terminal attributes
+    struct termios termios;
+} IPC_Tcgetattr_Reply;
 
-    /// ID of the filesystem
-    uint64_t filesystem_id;
-
-    /// Port associated with the file
-    pmos_port_t fs_port;
-} IPC_Dup_Reply;
-
-#define IPC_Create_Consumer_NUM 0x5a
-typedef struct IPC_Create_Consumer {
-    /// Message type (must be IPC_Create_Consumer_NUM)
+#define IPC_Waitpid_NUM 0x5f
+typedef struct IPC_Waitpid {
+    /// Message type (must be IPC_Waitpid_NUM)
     uint32_t type;
 
-    /// Flags changing the behaviour
+    /// Flags changing the behavior of the waitpid operation
     uint32_t flags;
 
-    /// Port where the reply would be sent
-    uint64_t reply_port;
+    /// Process ID to wait for
+    pid_t pid;
+} IPC_Waitpid;
 
-    /// ID of the tasks group representing the consumer
-    uint64_t task_group_id;
-} IPC_Create_Consumer;
-
-#define IPC_Create_Consumer_Reply_NUM 0x5b
-typedef struct IPC_Create_Consumer_Reply {
-    /// Message type (must be IPC_Create_Consumer_Reply_NUM)
+#define IPC_Waitpid_Reply_NUM 0x60
+typedef struct IPC_Waitpid_Reply {
+    /// Message type (must be IPC_Waitpid_Reply_NUM)
     uint32_t type;
 
-    /// Flags changing the behaviour
-    uint32_t flags;
-
-    /// Result of the operation
+    /// Result code indicating the outcome of the waitpid operation
     int32_t result_code;
-} IPC_Create_Consumer_Reply;
+
+    /// Process ID of the terminated child process
+    pid_t child_pid;
+
+    /// Exit status of the terminated child process
+    int status;
+
+    /// Resource usage information of the terminated child process
+    struct rusage rusage;
+} IPC_Waitpid_Reply;
 
 #define IPC_Close_NUM 0x5c
 /// Message sent by the user process to VFS daemon to close a file

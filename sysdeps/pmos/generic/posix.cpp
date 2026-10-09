@@ -795,4 +795,434 @@ extern "C" int get_fd_rights(int fd, pmos_right_t *op_right, pmos_right_t *io_ri
     return 0;
 }
 
+int Sysdeps<Tcgetwinsize>::operator()(int fd, struct winsize *winsz) {
+	int result;
+	return sysdep<Ioctl>(fd, TIOCGWINSZ, winsz, &result);
+}
+
+int Sysdeps<Tcsetwinsize>::operator()(int fd, const struct winsize *winsz) {
+	int result;
+	return sysdep<Ioctl>(fd, TIOCSWINSZ, const_cast<struct winsize *>(winsz), &result);
+}
+
+int Sysdeps<Tcgetattr>::operator()(int fd, struct termios *attr){
+    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+        return EBADF;
+
+    if (!isatty(fd))
+        return ENOTTY;
+
+    uint64_t io_right;
+    {
+        frg::unique_lock lock(filesystem_mutex);
+        if (open_files[fd].io_right == INVALID_RIGHT)
+            return EBADF;
+
+        io_right = open_files[fd].io_right;
+    }
+
+    IPC_Tcgetattr message = {
+        .type = IPC_Tcgetattr_NUM,
+        .flags = 0,
+    };
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto send_result = send_message_right(io_right, port, &message, sizeof(message), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Tcgetattr_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Tcgetattr_Reply_NUM)
+        return EIO;
+
+    if (reply.result_code < 0)
+        return -reply.result_code;
+
+    memcpy(attr, &reply.termios, sizeof(struct termios));
+    return 0;
+}
+
+int Sysdeps<Poll>::operator()(struct pollfd *fds, nfds_t count, int timeout, int *num_events) {
+    struct timespec ts;
+    auto ms = timeout % 1000;
+    ts.tv_sec = timeout / 1000;
+    ts.tv_nsec = ms * 1000000;
+    return Sysdeps<Ppoll>()(fds, count, timeout >= 0 ? &ts : nullptr, nullptr, num_events);
+}
+
+struct ReceiveRightHandler {
+    pmos_right_t port = 0;
+    pmos_right_t right = INVALID_RIGHT;
+
+    ReceiveRightHandler() = default;
+
+    ReceiveRightHandler(pmos_right_t port, pmos_right_t right)
+        : port(port), right(right) {}
+
+    ~ReceiveRightHandler() {
+        if (right != INVALID_RIGHT) {
+            delete_receive_right(port, right, DELETE_RIGHT_CLEAR_MESSAGE_QUEUE);
+        }
+    }
+
+    ReceiveRightHandler(ReceiveRightHandler &&other)
+        : port(other.port), right(other.right) {
+        other.right = INVALID_RIGHT;
+    }
+
+    ReceiveRightHandler &operator=(ReceiveRightHandler &&other) {
+        if (this != &other) {
+            if (right != INVALID_RIGHT) {
+                delete_receive_right(port, right, DELETE_RIGHT_CLEAR_MESSAGE_QUEUE);
+            }
+            port = other.port;
+            right = other.right;
+            other.right = INVALID_RIGHT;
+        }
+        return *this;
+    }
+
+    ReceiveRightHandler(const ReceiveRightHandler &) = delete;
+    ReceiveRightHandler &operator=(const ReceiveRightHandler &) = delete;
+
+    void release() {
+        right = INVALID_RIGHT;
+    }
+};
+
+using RRH = ReceiveRightHandler;
+
+struct Poll_Entry {
+    pmos_right_t io_right = INVALID_RIGHT;
+    RRH receive_right;
+};
+
+static int arm_timer(const struct timespec *timeout, pmos_right_t &out_right) {
+    __ensure(timeout);
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto result = pmos_create_timer(port);
+    if (result.result != SUCCESS)
+        return kernel_to_errno(result.result);
+
+    uint64_t time = timespec_to_kernel(timeout);
+
+    auto arm_result = pmos_set_timer(port, result.right, time, PMOS_SET_TIMER_RELATIVE);
+    if (arm_result) {
+        delete_receive_right(port, result.right, DELETE_RIGHT_CLEAR_MESSAGE_QUEUE);
+        return arm_result;
+    }
+
+    out_right = result.right;
+    return 0;
+}
+
+int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout, const sigset_t *sigmask, int *num_events) {
+    // TODO: Implement signals and sigmask
+    (void)sigmask;
+
+    if (nfds > __MLIBC_OPEN_MAX)
+        return EINVAL;
+
+    __ensure(num_events);
+    *num_events = 0;
+
+    frg::vector<Poll_Entry, MemoryAllocator> poll_entries(getAllocator());
+    poll_entries.resize(nfds);
+
+    // 1. Poll file descriptors without blocking. If any events are found, return immediately.
+    for (nfds_t i = 0; i < nfds; ++i)
+        fds[i].revents = 0;
+
+    size_t ipc_available = 0;
+
+    {
+        frg::unique_lock lock(filesystem_mutex);
+        for (nfds_t i = 0; i < nfds; ++i) {
+            if (fds[i].fd < 0)
+                continue;
+
+            if (fds[i].fd >= __MLIBC_OPEN_MAX) {
+                fds[i].revents = POLLNVAL;
+                (*num_events)++;
+                continue;
+            }
+
+            auto &file = open_files[fds[i].fd];
+            if (file.io_right == INVALID_RIGHT) {
+                fds[i].revents = POLLNVAL;
+                (*num_events)++;
+                continue;
+            }
+
+            poll_entries[i].io_right = file.io_right;
+            ++ipc_available;
+        }
+    }
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    constexpr uint16_t poll_events_mask = POLLIN | POLLOUT | POLLPRI;
+
+    size_t ipc_pending = 0;
+
+    auto ipc_poll = [&](bool nonblocking) {
+        for (nfds_t i = 0; i < nfds; ++i) {
+            if (poll_entries[i].io_right == INVALID_RIGHT)
+                continue;
+
+            uint16_t flags = 0;
+            if (nonblocking)
+                flags |= IPC_POLL_FLAG_NONBLOCK;
+
+            IPC_Poll msg = {
+                .type = IPC_Poll_NUM,
+                .flags = flags,
+                .events = static_cast<uint16_t>(fds[i].events & poll_events_mask),
+            };
+
+            auto send_result = send_message_right(poll_entries[i].io_right, port, &msg, sizeof(msg), nullptr, 0);
+            if (send_result.result != SUCCESS) {
+                fds[i].revents |= POLLERR;
+                poll_entries[i].io_right = INVALID_RIGHT;
+                (*num_events)++;
+                continue;
+            } else {
+                ++ipc_pending;
+                poll_entries[i].receive_right = RRH(port, send_result.right);
+            }
+        }
+    };
+
+    auto find_idx = [&](pmos_right_t receive_right) -> unsigned {
+        for (unsigned i = 0; i < nfds; ++i) {
+            if (poll_entries[i].receive_right.right == receive_right)
+                return i;
+        }
+        __ensure(!"Receive right not found in poll entries");
+        return 0;
+    };
+
+    auto fd_done = [&](unsigned idx, unsigned events) {
+        fds[idx].revents |= events;
+        --ipc_pending;
+        poll_entries[idx].receive_right.release();
+        if (events != 0) {
+            poll_entries[idx].io_right = INVALID_RIGHT;
+            --ipc_available;
+            (*num_events)++;
+        }
+    };
+
+    ipc_poll(true);
+    while (ipc_pending > 0) {
+        Message_Descriptor reply_descr;
+        auto result = syscall_get_message_info(&reply_descr, port, 0);
+        __ensure(result == SUCCESS);
+    
+        unsigned idx = find_idx(reply_descr.sent_with_right);
+        poll_entries[idx].receive_right.release();
+
+        IPC_Poll_Reply reply;
+        auto fr = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port);
+        __ensure(fr.result == SUCCESS);
+
+        if (reply_descr.size < sizeof(IPC_Generic_Msg)) {
+            fd_done(idx, POLLERR);
+            continue;
+        }
+
+        if (reply.type != IPC_Poll_Reply_NUM) {
+            fd_done(idx, POLLERR);
+            continue;
+        }
+
+        if (reply.result_code < 0) {
+            fd_done(idx, POLLERR);
+            continue;
+        }
+
+        fd_done(idx, reply.events);
+    }
+
+    if (*num_events > 0)
+        return 0;
+
+    RRH timer_receive_right;
+    if (timeout) {
+        if (timespec_to_kernel(timeout) == 0) {
+            return 0;
+        }
+
+        int timer_result = arm_timer(timeout, timer_receive_right.right);
+        if (timer_result)
+            return timer_result;
+    }
+
+    // Do the same, but block this time; return when any event occurs, RAII will clean up the receive rights and duplicate messages
+    ipc_poll(false);
+
+    if (ipc_pending == 0 && timer_receive_right.right == INVALID_RIGHT) {
+        return 0;
+    }
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.sent_with_right == timer_receive_right.right) {
+        timer_receive_right.release();
+        // Timeout
+        return 0;
+    }
+
+    unsigned idx = find_idx(reply_descr.sent_with_right);
+    IPC_Poll_Reply reply;
+    auto fr = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port);
+    __ensure(fr.result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg)) {
+        fd_done(idx, POLLERR);
+        return 0;
+    }
+    if (reply.type != IPC_Poll_Reply_NUM) {
+        fd_done(idx, POLLERR);
+        return 0;
+    }
+    if (reply.result_code < 0) {
+        fd_done(idx, POLLERR);
+        return 0;
+    }
+
+    fd_done(idx, reply.events);
+    return 0;
+}
+
+int Sysdeps<Pselect>::operator()(int num_fds, fd_set *read_set, fd_set *write_set, fd_set *except_set, const struct timespec *timeout, const sigset_t *sigmask, int *num_events) {
+    pollfd *fds = (pollfd *)malloc(num_fds * sizeof(pollfd));
+
+    if(fds == NULL)
+        return ENOMEM;
+
+    int actual_count = 0;
+
+    for(int fd = 0; fd < num_fds; ++fd) {
+        short events = 0;
+        if(read_set && FD_ISSET(fd, read_set)) {
+            events |= POLLIN;
+        }
+
+        if(write_set && FD_ISSET(fd, write_set)) {
+            events |= POLLOUT;
+        }
+
+        if(except_set && FD_ISSET(fd, except_set)) {
+            events |= POLLPRI;
+        }
+
+        if(events) {
+            fds[actual_count].fd = fd;
+            fds[actual_count].events = events;
+            fds[actual_count].revents = 0;
+            actual_count++;
+        }
+    }
+
+    int num;
+    int err = sysdep<Ppoll>(fds, actual_count, timeout, sigmask, &num);
+
+    if(err) {
+        free(fds);
+        return err;
+    }
+
+    #define READ_SET_POLLSTUFF (POLLIN | POLLHUP | POLLERR)
+    #define WRITE_SET_POLLSTUFF (POLLOUT | POLLERR)
+    #define EXCEPT_SET_POLLSTUFF (POLLPRI)
+
+    int return_count = 0;
+    for(int fd = 0; fd < actual_count; ++fd) {
+        int events = fds[fd].events;
+        if((events & POLLIN) && (fds[fd].revents & READ_SET_POLLSTUFF) == 0) {
+            FD_CLR(fds[fd].fd, read_set);
+            events &= ~POLLIN;
+        }
+
+        if((events & POLLOUT) && (fds[fd].revents & WRITE_SET_POLLSTUFF) == 0) {
+            FD_CLR(fds[fd].fd, write_set);
+            events &= ~POLLOUT;
+        }
+
+        if((events & POLLPRI) && (fds[fd].revents & EXCEPT_SET_POLLSTUFF) == 0) {
+            FD_CLR(fds[fd].fd, except_set);
+            events &= ~POLLPRI;
+        }
+
+        if(events)
+            return_count++;
+    }
+    *num_events = return_count;
+    free(fds);
+    return 0;
+}
+
+int Sysdeps<Waitpid>::operator()(pid_t pid, int *status, int flags, struct rusage *ru, pid_t *ret_pid) {
+    IPC_Waitpid message = {
+        .type = IPC_Waitpid_NUM,
+        .flags = static_cast<uint32_t>(flags),
+        .pid = pid,
+    };
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Waitpid_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Waitpid_Reply_NUM)
+        return EIO;
+
+    if (reply.result_code < 0)
+        return -reply.result_code;
+
+    *ret_pid = reply.child_pid;
+    if (status)
+        *status = reply.status;
+    if (ru)
+        *ru = reply.rusage;
+    
+    return 0;
+}
+
 } // namespace mlibc
