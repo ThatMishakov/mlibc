@@ -1343,4 +1343,25 @@ int Sysdeps<Faccessat>::operator()(int dirfd, const char *pathname, int mode, in
     return -reply.result_code;
 }
 
+int Sysdeps<Tcsetattr>::operator()(int fd, int optional_action, const struct termios *attr) {
+	int ret;
+
+    switch (optional_action) {
+		case TCSANOW:
+			optional_action = TCSETS; break;
+		case TCSADRAIN:
+			optional_action = TCSETSW; break;
+		case TCSAFLUSH:
+			optional_action = TCSETSF; break;
+		default:
+			__ensure(!"Unsupported tcsetattr");
+    }
+
+	if (int r = sysdep<Ioctl>(fd, optional_action, (void *)attr, &ret) != 0) {
+	    return r;
+	}
+
+	return 0;
+}
+
 } // namespace mlibc
