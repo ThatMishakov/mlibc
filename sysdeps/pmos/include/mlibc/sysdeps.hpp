@@ -53,6 +53,8 @@ struct PmosSysdepTags :
 	Dup,
 	GetPgid,
 	SetPgid,
+	GetResuid,
+	GetResgid,
 	Sigprocmask,
 	Tcgetattr,
 	Pselect,

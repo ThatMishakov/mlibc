@@ -600,13 +600,13 @@ static uint32_t get_id_generic(uint16_t id_type) {
 }
 
 uid_t Sysdeps<GetUid>::operator()() {
-    return get_id_generic(IPC_GET_ID_TYPE_UID);
+    return get_id_generic(IPC_GET_ID_TYPE_RUID);
 }
 uid_t Sysdeps<GetEuid>::operator()() {
     return get_id_generic(IPC_GET_ID_TYPE_EUID);
 }
 uid_t Sysdeps<GetGid>::operator()() {
-    return get_id_generic(IPC_GET_ID_TYPE_GID);
+    return get_id_generic(IPC_GET_ID_TYPE_RGID);
 }
 uid_t Sysdeps<GetEgid>::operator()() {
     return get_id_generic(IPC_GET_ID_TYPE_EGID);
@@ -616,6 +616,32 @@ pid_t Sysdeps<GetPid>::operator()() {
 }
 pid_t Sysdeps<GetPpid>::operator()() {
     return get_id_generic(IPC_GET_ID_TYPE_PPID);
+}
+
+int Sysdeps<GetResuid>::operator()(uid_t *ruid, uid_t *euid, uid_t *suid) {
+	if (ruid) {
+		*ruid = sysdep<GetUid>();
+	}
+	if (euid) {
+		*euid = sysdep<GetEuid>();
+	}
+	if (suid) {
+		*suid = get_id_generic(IPC_GET_ID_TYPE_SUID);
+	}
+	return 0;
+}
+
+int Sysdeps<GetResgid>::operator()(uid_t *rgid, uid_t *egid, uid_t *sgid) {
+	if (rgid) {
+		*rgid = sysdep<GetGid>();
+	}
+	if (egid) {
+		*egid = sysdep<GetEgid>();
+	}
+	if (sgid) {
+		*sgid = get_id_generic(IPC_GET_ID_TYPE_SGID);
+	}
+	return 0;
 }
 
 int Sysdeps<Pipe>::operator()(int *fds, int flags) {
