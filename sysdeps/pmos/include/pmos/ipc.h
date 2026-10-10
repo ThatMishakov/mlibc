@@ -302,6 +302,33 @@ typedef struct IPC_Timer_Expired {
     uint64_t deadline;
 } IPC_Timer_Expired;
 
+#define IPC_Faccessat_NUM 0x30
+typedef struct IPC_Faccessat {
+    /// Message type (must be IPC_Faccessat_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+
+    /// Access mode to check
+    uint32_t mode;
+
+    /// Path (without NULL terminator)
+    char path[0];
+} IPC_Faccessat;
+
+#define IPC_Faccessat_Reply_NUM 0x31
+typedef struct IPC_Faccessat_Reply {
+    /// Message type (must be IPC_Faccessat_Reply_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+
+    /// Result code (0 on success, -errno otherwise)
+    int32_t result_code;
+} IPC_Faccessat_Reply;
+
 #define IPC_Write_Plain_NUM 0x40
 typedef struct IPC_Write_Plain {
     uint32_t type;

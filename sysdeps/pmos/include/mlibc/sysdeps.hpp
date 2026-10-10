@@ -59,7 +59,9 @@ struct PmosSysdepTags :
 	Tcgetwinsize,
 	Tcsetwinsize,
 	Waitpid,
-	GetCwd
+	GetCwd,
+	Access,
+	Faccessat
 {};
 
 template<typename Tag>
