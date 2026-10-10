@@ -6,6 +6,7 @@
 #include <mlibc/allocator.hpp>
 #include <sys/ioctl.h>
 #include <pmos/fs-data.h>
+#include <alloca.h>
 
 using namespace mlibc::pmos;
 
@@ -45,8 +46,13 @@ int Sysdeps<Ioctl>::operator()(int fd, unsigned long request, void *arg, int *re
         ioctl_data.resize(sizeof(struct termios));
         memcpy(ioctl_data.data(), arg, sizeof(struct termios));
     }
+    case TIOCGWINSZ:
+        if (!arg)
+            return EINVAL;
+        if (!(flags & FLAG_ISATTY))
+            return ENOTTY;
         break;
-        default:
+    default:
         mlibc::infoLogger() << "\e[31mmlibc: unknown ioctl() request: " << request << "\e[0m" << frg::endlog;
         return ENOSYS;
     }
@@ -70,20 +76,35 @@ int Sysdeps<Ioctl>::operator()(int fd, unsigned long request, void *arg, int *re
     auto result = syscall_get_message_info(&reply_descr, port, 0);
     __ensure(result == SUCCESS);
 
-    IPC_Ioctl_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    IPC_Ioctl_Reply *reply = reinterpret_cast<IPC_Ioctl_Reply *>(alloca(reply_descr.size));
+    result = get_first_message(reinterpret_cast<char *>(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
         return EIO;
 
-    if (reply.type != IPC_Ioctl_Reply_NUM)
+    if (reply->type != IPC_Ioctl_Reply_NUM)
         return EIO;
 
-    if (reply.result_code < 0)
-        return -reply.result_code;
+    if (reply->result_code < 0)
+        return -reply->result_code;
 
-    *result_out = reply.result_code;
+    size_t data_size = reply_descr.size - sizeof(IPC_Ioctl_Reply);
+    switch (request) {
+    case TIOCGWINSZ: {
+        struct winsize *ws = reinterpret_cast<struct winsize *>(arg);
+        if (data_size < sizeof(struct winsize))
+            return EIO;
+
+        memcpy(ws, reply->data, sizeof(struct winsize));
+    }
+        break;
+    default:
+        break;
+    }
+
+    *result_out = reply->result_code;
+
     return 0;
 }
 
