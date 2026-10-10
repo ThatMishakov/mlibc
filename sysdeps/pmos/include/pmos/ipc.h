@@ -397,6 +397,30 @@ typedef struct IPC_Ioctl {
     /// TODO...
 } IPC_Ioctl;
 
+#define IPC_Getcwd_NUM 0x47
+typedef struct IPC_Getcwd {
+    /// Message type (must be IPC_Getcwd_NUM)
+    uint32_t type;
+
+    /// Flags changing the behaviour
+    uint32_t flags;
+} IPC_Getcwd;
+
+#define IPC_Getcwd_Reply_NUM 0x48
+typedef struct IPC_Getcwd_Reply {
+    /// Message type (must be IPC_Getcwd_Reply_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint16_t flags;
+
+    /// Result code (0 on success, -errno otherwise)
+    int16_t result_code;
+
+    /// Current working directory path
+    char cwd[];
+} IPC_Getcwd_Reply;
+
 #define IPC_Read_Reply_NUM 0x50
 typedef struct IPC_Read_Reply {
     /// Message type (must be IPC_Read_Reply_NUM)
@@ -593,6 +617,25 @@ typedef struct IPC_Execve_Reply {
     int32_t result_code;
 } IPC_Execve_Reply;
 
+#define IPC_Close_NUM 0x5c
+/// Message sent by the user process to VFS daemon to close a file
+typedef struct IPC_Close {
+    /// Message type (must be IPC_Create_Consumer_Reply_NUM)
+    uint32_t type;
+
+    /// Flags changing the behaviour
+    uint32_t flags;
+
+    /// ID of the file system consumer
+    uint64_t fs_consumer_id;
+
+    /// ID of the file system
+    uint64_t filesystem_id;
+
+    /// ID of the file
+    uint64_t file_id;
+} IPC_Close;
+
 #define IPC_Tcgetattr_NUM 0x5d
 typedef struct IPC_Tcgetattr {
     /// Message type (must be IPC_Tcgetattr_NUM)
@@ -643,25 +686,6 @@ typedef struct IPC_Waitpid_Reply {
     /// Resource usage information of the terminated child process
     struct rusage rusage;
 } IPC_Waitpid_Reply;
-
-#define IPC_Close_NUM 0x5c
-/// Message sent by the user process to VFS daemon to close a file
-typedef struct IPC_Close {
-    /// Message type (must be IPC_Create_Consumer_Reply_NUM)
-    uint32_t type;
-
-    /// Flags changing the behaviour
-    uint32_t flags;
-
-    /// ID of the file system consumer
-    uint64_t fs_consumer_id;
-
-    /// ID of the file system
-    uint64_t filesystem_id;
-
-    /// ID of the file
-    uint64_t file_id;
-} IPC_Close;
 
 #define IPC_ACPI_Request_RSDT_NUM 0x60
 typedef struct IPC_ACPI_Request_RSDT {

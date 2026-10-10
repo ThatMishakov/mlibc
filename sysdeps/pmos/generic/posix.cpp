@@ -1225,4 +1225,45 @@ int Sysdeps<Waitpid>::operator()(pid_t pid, int *status, int flags, struct rusag
     return 0;
 }
 
+int Sysdeps<GetCwd>::operator()(char *buff, size_t size) {
+    IPC_Getcwd message = {
+        .type = IPC_Getcwd_NUM,
+        .flags = 0,
+    };
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Getcwd_Reply *reply = (IPC_Getcwd_Reply *)alloca(reply_descr.size); 
+    result = get_first_message(reinterpret_cast<char *>(reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply->type != IPC_Getcwd_Reply_NUM)
+        return EIO;
+
+    if (reply->result_code < 0)
+        return -reply->result_code;
+
+    size_t name_length = reply_descr.size - sizeof(IPC_Getcwd_Reply);
+    if (name_length + 1 > size)
+        return ERANGE;
+
+    memcpy(buff, reply->cwd, name_length);
+    buff[name_length] = '\0';
+
+    return 0;
+}
+
 } // namespace mlibc
