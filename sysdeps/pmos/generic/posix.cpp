@@ -10,6 +10,7 @@
 #include <alloca.h>
 #include <mlibc/allocator.hpp>
 #include <unistd.h>
+#include <sys/ioctl.h>
 
 using namespace mlibc::pmos;
 
@@ -1264,6 +1265,56 @@ int Sysdeps<GetCwd>::operator()(char *buff, size_t size) {
     buff[name_length] = '\0';
 
     return 0;
+}
+
+int Sysdeps<Access>::operator()(const char *path, int mode){
+	return faccessat(AT_FDCWD, path, mode, 0);
+}
+
+int Sysdeps<Faccessat>::operator()(int dirfd, const char *pathname, int mode, int flags){
+    auto right = __posix_server_right;
+    if (dirfd != AT_FDCWD) {
+        if (dirfd < 0 || dirfd >= __MLIBC_OPEN_MAX)
+            return EBADF;
+
+        frg::unique_lock lock(filesystem_mutex);
+        if (open_files[dirfd].io_right == INVALID_RIGHT)
+            return EBADF;
+
+        right = open_files[dirfd].op_right;
+    }
+
+    auto len = strlen(pathname);
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    IPC_Faccessat *message = (IPC_Faccessat *)alloca(sizeof(IPC_Faccessat) + len);
+    message->type = IPC_Faccessat_NUM;
+    message->flags = flags;
+    message->mode = mode;
+    memcpy(message->path, pathname, len);
+
+    auto send_result = send_message_right(right, port, reinterpret_cast<void *>(message), sizeof(IPC_Faccessat) + len, nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Faccessat_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Faccessat_Reply_NUM)
+        return EIO;
+
+    return -reply.result_code;
 }
 
 } // namespace mlibc
