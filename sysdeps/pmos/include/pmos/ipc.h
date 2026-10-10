@@ -421,7 +421,8 @@ typedef struct IPC_Ioctl {
     /// Ioctl request code
     uint64_t request;
 
-    /// TODO...
+    /// Data for the ioctl request (depending on the request)
+    uint8_t data[0];
 } IPC_Ioctl;
 
 #define IPC_Getcwd_NUM 0x47
@@ -521,9 +522,8 @@ typedef struct IPC_Ioctl_Reply {
 
     int16_t result_code;
 
-    int32_t ioctl_result;
-
-    // TODO...
+    /// Output data (depends on the ioctl request)
+    uint8_t data[0];
 } IPC_Ioctl_Reply;
 
 #define IPC_Stat_NUM 0x56

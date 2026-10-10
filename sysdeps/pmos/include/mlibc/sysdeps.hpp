@@ -63,7 +63,8 @@ struct PmosSysdepTags :
 	Waitpid,
 	GetCwd,
 	Access,
-	Faccessat
+	Faccessat,
+	Tcsetattr
 {};
 
 template<typename Tag>
