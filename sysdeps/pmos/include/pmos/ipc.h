@@ -518,9 +518,9 @@ typedef struct IPC_Ioctl_Reply {
     /// Message type (must be IPC_Ioctl_Reply_NUM)
     uint32_t type;
 
-    uint16_t flags;
+    uint32_t flags;
 
-    int16_t result_code;
+    int64_t result_code;
 
     /// Output data (depends on the ioctl request)
     uint8_t data[0];
