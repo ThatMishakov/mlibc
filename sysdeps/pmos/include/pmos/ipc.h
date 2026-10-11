@@ -329,6 +329,36 @@ typedef struct IPC_Faccessat_Reply {
     int32_t result_code;
 } IPC_Faccessat_Reply;
 
+#define IPC_Readdir_NUM 0x32
+typedef struct IPC_Readdir {
+    /// Message type (must be IPC_Readdir_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+} IPC_Readdir;
+
+#define IPC_Readdir_Reply_NUM 0x33
+typedef struct IPC_Readdir_Reply {
+    /// Message type (must be IPC_Readdir_Reply_NUM)
+    uint32_t type;
+
+    /// Result code (0 on success, -errno otherwise)
+    int16_t result_code;
+
+    /// File type
+    uint16_t file_type;
+
+    /// Inode
+    uint64_t inode;
+
+    /// Offset of the next entry
+    uint64_t next_offset;
+
+    /// Name (without NULL terminator)
+    char name[0];
+} IPC_Readdir_Reply;
+
 #define IPC_Write_Plain_NUM 0x40
 typedef struct IPC_Write_Plain {
     uint32_t type;

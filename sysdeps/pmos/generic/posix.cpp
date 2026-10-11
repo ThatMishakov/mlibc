@@ -11,6 +11,7 @@
 #include <mlibc/allocator.hpp>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <dirent.h>
 
 using namespace mlibc::pmos;
 
@@ -1462,6 +1463,81 @@ int Sysdeps<Fcntl>::operator()(int fd, int cmd, va_list args, int *result) {
 
 int Sysdeps<OpenDir>::operator()(const char *path, int *fd) {
 	return sysdep<Open>(path, O_DIRECTORY, 0, fd);
+}
+
+int Sysdeps<ReadEntries>::operator()(int handle, void *buffer, size_t max_size, size_t *bytes_read) {
+    if (handle >= __MLIBC_OPEN_MAX || handle < 0)
+        return EBADF;
+
+    if (max_size < sizeof(struct dirent))
+        return EINVAL;
+
+    pmos_right_t io_right;
+    unsigned flags;
+    {
+        frg::unique_lock lock(filesystem_mutex);
+        if (open_files[handle].io_right == INVALID_RIGHT)
+            return EBADF;
+
+        io_right = open_files[handle].io_right;
+        flags = open_files[handle].flags;
+    }
+
+    IPC_Readdir message = {
+        .type = IPC_Readdir_NUM,
+        .flags = flags,
+    };
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto send_result = send_message_right(io_right, port, &message, sizeof(message), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Readdir_Reply *reply = (IPC_Readdir_Reply *)alloca(reply_descr.size);
+    result = get_first_message(reinterpret_cast<char *>(reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply->type != IPC_Readdir_Reply_NUM)
+        return EIO;
+
+    if (reply->result_code < 0)
+        return -reply->result_code;
+
+    auto d = static_cast<struct dirent *>(buffer);
+
+    constexpr size_t header_size = sizeof(IPC_Readdir_Reply);
+    if (reply_descr.size < header_size)
+        return EIO;
+
+    size_t name_length = reply_descr.size - header_size;
+    size_t dirent_length = sizeof(struct dirent) - sizeof(d->d_name) + name_length + 1;
+    if (dirent_length > max_size)
+        return ERANGE;
+
+    if (name_length == 0) {
+        *bytes_read = 0;
+        return 0;
+    }
+
+    d->d_ino = reply->inode;
+    d->d_off = reply->next_offset;
+    d->d_reclen = dirent_length;
+    d->d_type = static_cast<uint8_t>(reply->file_type);
+    memcpy(d->d_name, reply->name, name_length);
+    d->d_name[name_length] = '\0';
+
+    *bytes_read = dirent_length;
+    return 0;
 }
 
 } // namespace mlibc
