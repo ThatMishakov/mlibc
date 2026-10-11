@@ -696,6 +696,7 @@ int Sysdeps<Pipe>::operator()(int *fds, int flags) {
             open_files[i].io_right = extra_rights[0];
             open_files[i].op_right = extra_rights[0];
             open_files[i].flags    = reply.flags;
+            open_files[i].flags   |= O_RD;
             fds[0] = i;
 
             break;
@@ -710,6 +711,7 @@ int Sysdeps<Pipe>::operator()(int *fds, int flags) {
             open_files[i].io_right = extra_rights[1];
             open_files[i].op_right = extra_rights[1];
             open_files[i].flags    = reply.flags;
+            open_files[i].flags   |= O_WR;
 
             fds[1] = i;
 
@@ -1395,6 +1397,67 @@ int Sysdeps<Kill>::operator()(pid_t pid, int signal) {
         return EIO;
 
     return -reply.result;
+}
+
+int Sysdeps<Fcntl>::operator()(int fd, int cmd, va_list args, int *result) {
+    constexpr unsigned fd_flags = FD_CLOEXEC; // FD_CLOFORK
+    constexpr unsigned status_flags = O_APPEND | O_DSYNC | O_NONBLOCK | O_RSYNC | O_SYNC | O_ACCMODE;
+
+    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+        return EBADF;
+
+    switch (cmd) {
+    case F_GETFD: {
+        frg::unique_lock lock(filesystem_mutex);
+        if (open_files[fd].io_right == INVALID_RIGHT)
+            return EBADF;
+
+        *result = open_files[fd].flags & fd_flags;
+        return 0;
+    }
+        break;
+    case F_SETFD: {
+        auto arg = va_arg(args, int);
+
+        frg::unique_lock lock(filesystem_mutex);
+        if (open_files[fd].io_right == INVALID_RIGHT)
+            return EBADF;
+
+        open_files[fd].flags &= ~fd_flags;
+        open_files[fd].flags |= arg & fd_flags;
+        *result = 0;
+        return 0;
+    }
+        break;
+    case F_GETFL: {
+        frg::unique_lock lock(filesystem_mutex);
+        if (open_files[fd].io_right == INVALID_RIGHT)
+            return EBADF;
+
+        *result = open_files[fd].flags & status_flags;
+        return 0;
+    }
+        break;
+    case F_SETFL: {
+        auto arg = va_arg(args, int);
+
+        frg::unique_lock lock(filesystem_mutex);
+        if (open_files[fd].io_right == INVALID_RIGHT)
+            return EBADF;
+
+        unsigned mask = status_flags & ~O_ACCMODE;
+
+        open_files[fd].flags &= ~mask;
+        open_files[fd].flags |= arg & mask;
+        *result = 0;
+        return 0;
+    }
+
+    default:
+        mlibc::infoLogger() << "mlibc: Unrecognized fcntl command: " << cmd << frg::endlog;
+        return ENOSYS;
+        break;
+    }
 }
 
 } // namespace mlibc

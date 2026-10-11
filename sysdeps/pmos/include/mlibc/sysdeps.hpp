@@ -65,7 +65,8 @@ struct PmosSysdepTags :
 	Access,
 	Faccessat,
 	Tcsetattr,
-	Kill
+	Kill,
+	Fcntl
 {};
 
 template<typename Tag>

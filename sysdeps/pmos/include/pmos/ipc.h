@@ -610,10 +610,10 @@ typedef struct IPC_Open_Reply {
     uint32_t type;
 
     /// Result code indicating the outcome of the open operation
-    int16_t result_code;
+    int32_t result_code;
 
     /// Flags associated with the file system
-    uint16_t fs_flags;
+    uint32_t fs_flags;
 } IPC_Open_Reply;
 
 #define IPC_Execve_NUM 0x5a
@@ -881,37 +881,6 @@ typedef struct IPC_FS_Resolve_Path {
     char path_name[];
 } IPC_FS_Resolve_Path;
 
-#define IPC_FS_Dup_NUM 0xC5
-/// @brief Message sent by a user process to VFS daemon to duplicate a file.
-///        This function is used by dup2() or similar functions where fs_consumer_id ==
-///        new_consumer_id and during the fork() operation or similar, where the file is
-///        reopened/duplicated into the new filesystem consumer.
-typedef struct IPC_FS_Dup {
-    /// Message type (must be IPC_FS_Dup_NUM)
-    uint32_t type;
-
-    /// Flags changing the behaviour
-    uint32_t flags;
-
-    /// ID of the operation, must be the same in the request and reply
-    uint64_t operation_id;
-
-    /// ID of the file to be duplicated
-    uint64_t file_id;
-
-    /// ID of the filesystem
-    uint64_t filesystem_id;
-
-    /// ID of the consumer that has the file currently opened
-    uint64_t fs_consumer_id;
-
-    /// ID of the consumer that will have the file opened
-    uint64_t new_consumer_id;
-
-    /// Port where the reply would be sent
-    uint64_t reply_port;
-} IPC_FS_Dup;
-
 #define IPC_FS_Close_NUM 0xC6
 /// Message sent by a VFS daemon to a filesystem driver to close a file
 typedef struct IPC_FS_Close {
@@ -961,10 +930,10 @@ typedef struct IPC_FS_Open_Reply {
     uint32_t type;
 
     /// Result code indicating the outcome of the open operation
-    int16_t result_code;
+    int32_t result_code;
 
     /// Flags associated with the file system
-    uint16_t fs_flags;
+    uint32_t fs_flags;
 } IPC_FS_Open_Reply;
 
 #define IPC_Mount_FS_Reply_NUM 0xD2
@@ -1025,27 +994,6 @@ typedef struct IPC_FS_Resolve_Path_Reply {
     /// Block size
     uint64_t st_blksize;
 } IPC_FS_Resolve_Path_Reply;
-
-#define IPC_FS_Dup_Reply_NUM 0xD5
-typedef struct IPC_FS_Dup_Reply {
-    /// Message type (must be IPC_FS_Dup_Reply_NUM)
-    uint32_t type;
-
-    /// Result code indicating the outcome of the open operation
-    int16_t result_code;
-
-    /// Flags associated with the file system
-    uint16_t fs_flags;
-
-    /// Port associated with the file
-    pmos_port_t file_port;
-
-    /// ID of the file within the file system
-    uint64_t file_id;
-
-    /// Operation ID
-    uint64_t operation_id;
-} IPC_FS_Dup_Reply;
 
 #define IPC_FS_PROPERTY_TYPE 0x01
 #define IPC_FS_PROPERTY_UUID 0x02
@@ -1142,11 +1090,11 @@ typedef struct IPC_Pipe_Open_Reply {
     /// Message type (must be IPC_Pipe_Open_Reply_NUM)
     uint32_t type;
 
-    /// Flags
-    uint16_t flags;
+    /// Flags (excluding O_ACCMODE, must be set by the receiver accordingly to the end)
+    uint32_t flags;
 
     /// Result code indicating the outcome of the open operation
-    int16_t result_code;
+    int32_t result_code;
 
     // On success, right 0 is read right, right 1 is write right
 } IPC_Pipe_Open_Reply;

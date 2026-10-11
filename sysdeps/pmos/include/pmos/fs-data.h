@@ -14,5 +14,5 @@ struct PmosFsData {
     struct PmosOpenFile open_files[];
 };
 
-#define FLAG_ISATTY 0x01
-#define FLAG_ISPIPE 0x02
+#define FLAG_ISATTY (1 << 31)
+#define FLAG_ISPIPE (1 << 30)
