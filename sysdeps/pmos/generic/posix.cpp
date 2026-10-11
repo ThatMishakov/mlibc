@@ -1364,4 +1364,37 @@ int Sysdeps<Tcsetattr>::operator()(int fd, int optional_action, const struct ter
 	return 0;
 }
 
+int Sysdeps<Kill>::operator()(pid_t pid, int signal) {
+    IPC_Kill message = {
+        .type = IPC_Kill_NUM,
+        .flags = 0,
+        .pid = pid,
+        .signal = signal,
+    };
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Kill_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Kill_Reply_NUM)
+        return EIO;
+
+    return -reply.result;
+}
+
 } // namespace mlibc

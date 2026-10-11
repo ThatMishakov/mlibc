@@ -64,7 +64,8 @@ struct PmosSysdepTags :
 	GetCwd,
 	Access,
 	Faccessat,
-	Tcsetattr
+	Tcsetattr,
+	Kill
 {};
 
 template<typename Tag>

@@ -1595,6 +1595,33 @@ typedef struct IPC_Get_ID_For {
     int32_t pid;
 } IPC_Get_ID_For;
 
+#define IPC_Kill_NUM 0x185
+typedef struct IPC_Kill {
+    /// Message type (must be IPC_Kill_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+
+    /// PID of the process to send the signal to
+    int32_t pid;
+
+    /// Signal number to send
+    int32_t signal;
+} IPC_Kill;
+
+#define IPC_Kill_Reply_NUM 0x186
+typedef struct IPC_Kill_Reply {
+    /// Message type (must be IPC_Kill_Reply_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+
+    /// Result code (-errno)
+    int32_t result;
+} IPC_Kill_Reply;
+
 #define IPC_Request_Right_Reply_NUM 0x18a
 typedef struct IPC_Request_Right_Reply {
     /// Message type (must be IPC_Get_Right_Reply_NUM)
