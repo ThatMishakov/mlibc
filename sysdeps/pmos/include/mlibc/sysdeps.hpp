@@ -66,7 +66,8 @@ struct PmosSysdepTags :
 	Faccessat,
 	Tcsetattr,
 	Kill,
-	Fcntl
+	Fcntl,
+	OpenDir
 {};
 
 template<typename Tag>

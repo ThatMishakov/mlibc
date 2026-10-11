@@ -1460,4 +1460,8 @@ int Sysdeps<Fcntl>::operator()(int fd, int cmd, va_list args, int *result) {
     }
 }
 
+int Sysdeps<OpenDir>::operator()(const char *path, int *fd) {
+	return sysdep<Open>(path, O_DIRECTORY, 0, fd);
+}
+
 } // namespace mlibc
