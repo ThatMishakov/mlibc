@@ -260,7 +260,7 @@ int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offse
     if (io_right == INVALID_RIGHT)
         return EBADF;
 
-    if (flags & FLAG_ISPIPE)
+    if (flags & (FLAG_ISPIPE | FLAG_ISATTY))
         return ESPIPE;
 
     auto port = __pmos_prepare_reply_port();
