@@ -579,8 +579,9 @@ void pmos_syscall_exit(unsigned reason, bool terminate_process);
 
 /// @brief Terminates the process with the given right.
 /// @param process_right Process right to terminate. Must be in the caller's NAMESPACE_RIGHT
+/// @param return_value Return value for the terminated process
 /// @return Result of the operation
-result_t terminate_process(pmos_right_t process_right);
+result_t terminate_process(pmos_right_t process_right, u32 return_value);
 
 /// @brief Creates a right for the task group with the given ID. The right is a weak reference.
 /// @param task_group_id Task group ID for which the right should be created. Caller must be in the group

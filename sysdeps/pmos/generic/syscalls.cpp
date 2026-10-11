@@ -686,12 +686,12 @@ right_request_t right_for_task_group(uint64_t task_group_id)
     };
 }
 
-result_t terminate_process(uint64_t task_group_id)
+result_t terminate_process(uint64_t task_group_id, uint32_t return_code)
 {
     #ifdef __32BITSYSCALL
-    return syscall32_2(SYSCALL_TERMINATE_PROCESS, (uint32_t)task_group_id, task_group_id >> 32).result;
+    return syscall32_3(SYSCALL_TERMINATE_PROCESS, (uint32_t)task_group_id, task_group_id >> 32, return_code).result;
     #else
-    return syscall1(SYSCALL_TERMINATE_PROCESS, task_group_id).result;
+    return syscall2(SYSCALL_TERMINATE_PROCESS, task_group_id, return_code).result;
     #endif
 }
 
