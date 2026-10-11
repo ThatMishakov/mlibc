@@ -696,7 +696,7 @@ int Sysdeps<Pipe>::operator()(int *fds, int flags) {
             open_files[i].io_right = extra_rights[0];
             open_files[i].op_right = extra_rights[0];
             open_files[i].flags    = reply.flags;
-            open_files[i].flags   |= O_RD;
+            open_files[i].flags   |= O_RDONLY;
             fds[0] = i;
 
             break;
@@ -711,7 +711,7 @@ int Sysdeps<Pipe>::operator()(int *fds, int flags) {
             open_files[i].io_right = extra_rights[1];
             open_files[i].op_right = extra_rights[1];
             open_files[i].flags    = reply.flags;
-            open_files[i].flags   |= O_WR;
+            open_files[i].flags   |= O_WRONLY;
 
             fds[1] = i;
 
@@ -1400,7 +1400,7 @@ int Sysdeps<Kill>::operator()(pid_t pid, int signal) {
 }
 
 int Sysdeps<Fcntl>::operator()(int fd, int cmd, va_list args, int *result) {
-    constexpr unsigned fd_flags = FD_CLOEXEC; // FD_CLOFORK
+    constexpr unsigned fd_flags = O_CLOEXEC; // FD_CLOFORK
     constexpr unsigned status_flags = O_APPEND | O_DSYNC | O_NONBLOCK | O_RSYNC | O_SYNC | O_ACCMODE;
 
     if (fd >= __MLIBC_OPEN_MAX || fd < 0)
