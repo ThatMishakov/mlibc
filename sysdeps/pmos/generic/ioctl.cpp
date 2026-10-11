@@ -52,6 +52,9 @@ int Sysdeps<Ioctl>::operator()(int fd, unsigned long request, void *arg, int *re
         if (!(flags & FLAG_ISATTY))
             return ENOTTY;
         break;
+    case TIOCGPGRP: {
+        // Nothing
+    }   break;
     default:
         mlibc::infoLogger() << "\e[31mmlibc: unknown ioctl() request: " << request << "\e[0m" << frg::endlog;
         return ENOSYS;
