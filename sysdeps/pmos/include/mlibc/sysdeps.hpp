@@ -68,7 +68,9 @@ struct PmosSysdepTags :
 	Kill,
 	Fcntl,
 	OpenDir,
-	ReadEntries
+	ReadEntries,
+	Chdir,
+	Fchdir
 {};
 
 template<typename Tag>

@@ -1540,4 +1540,82 @@ int Sysdeps<ReadEntries>::operator()(int handle, void *buffer, size_t max_size, 
     return 0;
 }
 
+int Sysdeps<Chdir>::operator()(const char *path) {
+    auto right = __posix_server_right;
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto len = strlen(path);
+    auto chdir_msg = reinterpret_cast<IPC_Chdir *>(alloca(sizeof(IPC_Chdir) + len));
+    chdir_msg->type = IPC_Chdir_NUM;
+    chdir_msg->flags = 0;
+    memcpy(chdir_msg->path, path, len);
+
+    auto send_result = send_message_right(right, port, reinterpret_cast<void *>(chdir_msg), sizeof(IPC_Chdir) + len, nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Chdir_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Chdir_Reply_NUM)
+        return EIO;
+
+    return -reply.result_code;
+}
+
+int Sysdeps<Fchdir>::operator()(int fd) {
+    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+        return EBADF;
+
+    pmos_right_t op_right;
+    {
+        frg::unique_lock lock(filesystem_mutex);
+        if (open_files[fd].op_right == INVALID_RIGHT)
+            return EBADF;
+
+        op_right = open_files[fd].op_right;
+    }
+
+    IPC_Chdir message = {
+        .type = IPC_Chdir_NUM,
+        .flags = 0,
+        .path = {},
+    };
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto send_result = send_message_right(op_right, port, reinterpret_cast<void *>(&message), sizeof(message), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Chdir_Reply reply;
+    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply.type != IPC_Chdir_Reply_NUM)
+        return EIO;
+
+    return -reply.result_code;
+}
+
 } // namespace mlibc

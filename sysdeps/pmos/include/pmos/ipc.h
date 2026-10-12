@@ -41,6 +41,12 @@ typedef struct IPC_Generic_Msg {
     uint32_t type;
 } IPC_Generic_Msg;
 
+#define IPC_Generic_Result_NUM 0x03
+typedef struct IPC_Generic_Result {
+    uint32_t type;
+    int32_t result;
+} IPC_Generic_Result;
+
 #define IPC_MIN_SIZE         (sizeof(IPC_Generic_Msg))
 #define IPC_RIGHT_SIZE(type) (sizeof(type))
 #define IPC_TYPE(ptr)        (((IPC_Generic_Msg *)ptr)->type)
@@ -358,6 +364,30 @@ typedef struct IPC_Readdir_Reply {
     /// Name (without NULL terminator)
     char name[0];
 } IPC_Readdir_Reply;
+
+#define IPC_Chdir_NUM 0x34
+typedef struct IPC_Chdir {
+    /// Message type (must be IPC_Chdir_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+
+    /// Path (without NULL terminator)
+    char path[0];
+} IPC_Chdir;
+
+#define IPC_Chdir_Reply_NUM 0x35
+typedef struct IPC_Chdir_Reply {
+    /// Message type (must be IPC_Chdir_Reply_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+
+    /// Result code (0 on success, -errno otherwise)
+    int32_t result_code;
+} IPC_Chdir_Reply;
 
 #define IPC_Write_Plain_NUM 0x40
 typedef struct IPC_Write_Plain {
