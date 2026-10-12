@@ -389,6 +389,36 @@ typedef struct IPC_Chdir_Reply {
     int32_t result_code;
 } IPC_Chdir_Reply;
 
+#define IPC_Uname_NUM 0x36
+typedef struct IPC_Uname {
+    /// Message type (must be IPC_Uname_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+} IPC_Uname;
+
+#define IPC_Uname_Reply_NUM 0x37
+typedef struct IPC_Uname_Reply {
+    /// Message type (must be IPC_Uname_Reply_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+
+    /// Result code (0 on success, -errno otherwise)
+    int32_t result_code;
+
+    /// Utsname structure
+    //struct utsname utsname;
+    char sysname[65];
+    char nodename[65];
+    char release[65];
+    char version[65];
+    char machine[65];
+    char domainname[65];
+} IPC_Get_Utsname_Reply;
+
 #define IPC_Write_Plain_NUM 0x40
 typedef struct IPC_Write_Plain {
     uint32_t type;

@@ -70,7 +70,9 @@ struct PmosSysdepTags :
 	OpenDir,
 	ReadEntries,
 	Chdir,
-	Fchdir
+	Fchdir,
+	GetHostname,
+	Uname
 {};
 
 template<typename Tag>

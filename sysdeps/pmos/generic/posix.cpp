@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <dirent.h>
+#include <sys/utsname.h>
 
 using namespace mlibc::pmos;
 
@@ -1616,6 +1617,63 @@ int Sysdeps<Fchdir>::operator()(int fd) {
         return EIO;
 
     return -reply.result_code;
+}
+
+int Sysdeps<GetHostname>::operator()(char *buf, size_t bufsize)
+{
+	struct utsname uname_buf;
+	if (int r = sysdep<Uname>(&uname_buf); r != 0)
+		return r;
+
+	auto node_len = strlen(uname_buf.nodename);
+	if (node_len >= bufsize)
+		return ENAMETOOLONG;
+
+	memcpy(buf, uname_buf.nodename, node_len);
+	buf[node_len] = '\0';
+	return 0;
+}
+
+int Sysdeps<Uname>::operator()(struct utsname *buf)
+{
+    IPC_Uname message = {
+        .type = IPC_Uname_NUM,
+        .flags = 0,
+    };
+
+    auto port = __pmos_prepare_reply_port();
+    if (port == INVALID_PORT)
+        return EIO;
+
+    auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
+    if (send_result.result != SUCCESS)
+        return -send_result.result;
+
+    Message_Descriptor reply_descr;
+    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    __ensure(result == SUCCESS);
+
+    IPC_Uname_Reply *reply = (IPC_Uname_Reply *)alloca(reply_descr.size);
+    result = get_first_message(reinterpret_cast<char *>(reply), MSG_ARG_REJECT_RIGHT, port).result;
+    __ensure(result == SUCCESS);
+
+    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply->type != IPC_Uname_Reply_NUM)
+        return EIO;
+
+    if (reply->result_code < 0)
+        return -reply->result_code;
+
+    memcpy(buf->sysname, reply->sysname, sizeof(buf->sysname));
+    memcpy(buf->nodename, reply->nodename, sizeof(buf->nodename));
+    memcpy(buf->release, reply->release, sizeof(buf->release));
+    memcpy(buf->version, reply->version, sizeof(buf->version));
+    memcpy(buf->machine, reply->machine, sizeof(buf->machine));
+    memcpy(buf->domainname, reply->domainname, sizeof(buf->domainname));
+
+    return 0;
 }
 
 } // namespace mlibc
