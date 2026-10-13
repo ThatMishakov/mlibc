@@ -11,6 +11,26 @@
 #include <mlibc/debug.hpp>
 #include <mlibc/tcb.hpp>
 
+#include <mlibc/sysdeps-allocator.hpp>
+
+SysdepAllocatorCapability sysdepAllocatorCapability;
+
+void *mlibc::PmosSysdepsPolicy::map(size_t size) {
+	void *ptr;
+	__ensure(!mlibc::sysdep<AnonAllocate>(size, &ptr));
+	return ptr;
+}
+
+void mlibc::PmosSysdepsPolicy::unmap(void *ptr, size_t size) {
+	__ensure(!mlibc::sysdep<AnonFree>(ptr, size));
+}
+
+SysdepsPool &getSysdepsPool() {
+	return mlibc::get_current_tcb()->sysdepData.pool;
+}
+
+constinit SysdepsAllocator sysdepsAllocator;
+
 #define STUB()                                                                                     \
     ({                                                                                             \
         __ensure(!"STUB function was called");                                                     \
@@ -106,7 +126,7 @@ int Sysdeps<Sysconf>::operator()(int num, long *rret) {
 
 #ifdef __m68k__
 extern "C"
-#if MLIBC_BUILDING_RTLD
+#if MLIBC_BUILDING_RTLD || MLIBC_STATIC_BUILD
 __attribute__((visibility("hidden")))
 #endif
 void *__m68k_read_tp() {

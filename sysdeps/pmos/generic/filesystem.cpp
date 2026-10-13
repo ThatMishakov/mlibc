@@ -1,6 +1,6 @@
 #include <mlibc/debug.hpp>
 #include <mlibc/all-sysdeps.hpp>
-#include <mlibc/allocator.hpp>
+#include <mlibc/sysdeps-allocator.hpp>
 
 #include <frg/array.hpp>
 #include <frg/scope_exit.hpp>
@@ -224,7 +224,7 @@ int Sysdeps<Read>::operator()(int fd, void *buff, size_t count, ssize_t *bytes_r
     // TODO: Handle EINTR (as above)
     __ensure(result == SUCCESS);
 
-    frg::vector<uint8_t, MemoryAllocator> reply_data(getAllocator());
+    frg::vector<uint8_t, SysdepsAllocator> reply_data(getSysdepsAllocator());
     reply_data.resize(reply_descr.size);
     result = get_first_message(reinterpret_cast<char *>(reply_data.data()), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);

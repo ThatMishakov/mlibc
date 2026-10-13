@@ -1,8 +1,15 @@
 #pragma once
 
 #include <mlibc/sysdep-signatures.hpp>
+#include <frg/sharded_slab.hpp>
 
 namespace mlibc {
+
+// Reusing ShardedSlabBasePolicy produces a circular dependency
+struct PmosSysdepsPolicy {
+	void *map(size_t size);
+	void unmap(void *ptr, size_t size);
+};
 
 struct PmosSysdepTags :
 	LibcPanic,
@@ -86,6 +93,8 @@ struct PmosTcbData {
 	uint64_t threadPort;
 
 	uint64_t sigmask = 0;
+
+	frg::sharded_slab::pool<PmosSysdepsPolicy> pool;
 };
 
 using SysdepTcbData = PmosTcbData;

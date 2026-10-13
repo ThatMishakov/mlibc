@@ -3,7 +3,7 @@
 #include <frg/mutex.hpp>
 #include <pmos/ipc.h>
 #include <frg/vector.hpp>
-#include <mlibc/allocator.hpp>
+#include <mlibc/sysdeps-allocator.hpp>
 #include <sys/ioctl.h>
 #include <pmos/fs-data.h>
 #include <alloca.h>
@@ -28,7 +28,7 @@ int Sysdeps<Ioctl>::operator()(int fd, unsigned long request, void *arg, int *re
     if (port == INVALID_PORT)
         return EIO;
 
-    frg::vector<uint8_t, MemoryAllocator> ioctl_data(getAllocator());
+    frg::vector<uint8_t, SysdepsAllocator> ioctl_data(getSysdepsAllocator());
 
     switch (request) {
     case TIOCSCTTY: {
@@ -66,7 +66,7 @@ int Sysdeps<Ioctl>::operator()(int fd, unsigned long request, void *arg, int *re
         .request = request,
         .data = {},
     };
-    frg::vector<uint8_t, MemoryAllocator> message_data(getAllocator());
+    frg::vector<uint8_t, SysdepsAllocator> message_data(getSysdepsAllocator());
     message_data.resize(sizeof(message) + ioctl_data.size());
     memcpy(message_data.data(), &message, sizeof(message));
     memcpy(message_data.data() + sizeof(message), ioctl_data.data(), ioctl_data.size());

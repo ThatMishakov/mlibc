@@ -8,7 +8,7 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <alloca.h>
-#include <mlibc/allocator.hpp>
+#include <mlibc/sysdeps-allocator.hpp>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <dirent.h>
@@ -502,11 +502,11 @@ static int prepare_filesystem_object(pmos_right_t &new_fs_right)
 }
 
 int Sysdeps<Execve>::operator()(const char *path, char *const argv[], char *const envp[]) {
-	frg::string<MemoryAllocator> args_area(getAllocator());
+	frg::string<SysdepsAllocator> args_area(getSysdepsAllocator());
 	for (auto it = argv; *it; ++it)
 		args_area += frg::string_view{*it, strlen(*it) + 1};
 
-	frg::string<MemoryAllocator> env_area(getAllocator());
+	frg::string<SysdepsAllocator> env_area(getSysdepsAllocator());
 	for (auto it = envp; *it; ++it)
 		env_area += frg::string_view{*it, strlen(*it) + 1};
 
@@ -519,7 +519,7 @@ int Sysdeps<Execve>::operator()(const char *path, char *const argv[], char *cons
         .data = {},
     };
 
-    frg::vector<char, MemoryAllocator> message_data(getAllocator());
+    frg::vector<char, SysdepsAllocator> message_data(getSysdepsAllocator());
     message_data.resize(sizeof(message) + message.path_length + message.args_length + message.envs_length);
     auto ptr = message_data.data();
     memcpy(ptr, &message, sizeof(message));
@@ -974,7 +974,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
     __ensure(num_events);
     *num_events = 0;
 
-    frg::vector<Poll_Entry, MemoryAllocator> poll_entries(getAllocator());
+    frg::vector<Poll_Entry, SysdepsAllocator> poll_entries(getSysdepsAllocator());
     poll_entries.resize(nfds);
 
     // 1. Poll file descriptors without blocking. If any events are found, return immediately.
