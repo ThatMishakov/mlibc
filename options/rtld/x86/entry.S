@@ -7,10 +7,11 @@ PROC_START(_start)
 	/* The ABI requires the stack to be aligned to 16 bytes, but the older ABI didn't guarantee this on process entry */
 	andl $-16, %esp
 
+	lea -12(%esp), %esp
+	push %esi
 	call relocateSelf
 	lea 4(%esp), %esp
 
-	lea -12(%esp), %esp
 	push %esi
 	call interpreterMain
 	
