@@ -194,12 +194,13 @@ result_t syscall_get_message_info(Message_Descriptor *descr, pmos_port_t port, u
  * @param buff The buffer to where the message should written. Callee must ensure it is large enough
  * to hold the message (should be known from the syscall_get_message_info() )
  * @param port The valid port from which to get the message. Callee must be the port's owner
+ * @param max_size The maximum size of the buffer (or -1). The kernel copies min(max_size, message size)
  * @param args Aguments. MSG_ARG_NOPOP: do not pop the message after executing the command.
  *             MSG_ARG_REJECT_RIGHT: do not accept the reply right in the message.
  * @return result of the execution. On success, buff should contain the message. If the message is
  *         poped, the reply right is returned.
  */
-right_request_t get_first_message(char *buff, uint32_t args, pmos_port_t port);
+right_request_t get_first_message(char *buff, size_t max_size, uint32_t args, pmos_port_t port);
 
 /**
  * @brief Chages the tasks' scheduler priority

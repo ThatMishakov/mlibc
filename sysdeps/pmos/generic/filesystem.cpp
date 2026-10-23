@@ -178,7 +178,7 @@ int Sysdeps<Write>::operator()(int fd, const void *buff, size_t count, ssize_t *
     __ensure(result == SUCCESS);
 
     IPC_Write_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -226,7 +226,7 @@ int Sysdeps<Read>::operator()(int fd, void *buff, size_t count, ssize_t *bytes_r
 
     frg::vector<uint8_t, SysdepsAllocator> reply_data(getSysdepsAllocator());
     reply_data.resize(reply_descr.size);
-    result = get_first_message(reinterpret_cast<char *>(reply_data.data()), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(reply_data.data()), reply_descr.size, MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -283,7 +283,7 @@ int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offse
     __ensure(result == SUCCESS);
 
     IPC_Seek_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -331,7 +331,7 @@ int Sysdeps<Open>::operator()(const char *pathname, int flags, mode_t mode, int 
     });
 
     IPC_Open_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -480,7 +480,7 @@ int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int
     });
 
     IPC_Get_Object_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -578,7 +578,7 @@ int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int f
     __ensure(result == SUCCESS);
 
     IPC_Stat_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))

@@ -26,11 +26,11 @@ result_t get_message(Message_Descriptor *desc, unsigned char **message, pmos_por
     }
 
     if (reply_right) {
-        right_request_t r = get_first_message((char *)*message, 0, port);
+        right_request_t r = get_first_message((char *)*message, desc->size, 0, port);
         *reply_right = r.right;
         result = r.result;
     } else {
-        result = get_first_message((char *)*message, MSG_ARG_REJECT_RIGHT, port).result;
+        result = get_first_message((char *)*message, desc->size, MSG_ARG_REJECT_RIGHT, port).result;
     }
     if (result != SUCCESS) {
         free(*message);

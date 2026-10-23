@@ -80,7 +80,7 @@ int Sysdeps<Ioctl>::operator()(int fd, unsigned long request, void *arg, int *re
     __ensure(result == SUCCESS);
 
     IPC_Ioctl_Reply *reply = reinterpret_cast<IPC_Ioctl_Reply *>(alloca(reply_descr.size));
-    result = get_first_message(reinterpret_cast<char *>(reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(reply), reply_descr.size, MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))

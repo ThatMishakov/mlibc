@@ -144,13 +144,13 @@ result_t accept_rights(pmos_port_t port, pmos_right_t *rights_array)
     #endif
 }
 
-right_request_t get_first_message(char *buff, uint32_t args, uint64_t port)
+right_request_t get_first_message(char *buff, size_t max_size, uint32_t args, pmos_port_t port)
 {
     syscall_r result;
 #ifdef __32BITSYSCALL
-    result = syscall32_3(SYSCALL_GET_MESSAGE | (args << 8), (uint32_t)port, port >> 32, (unsigned)buff);
+    result = syscall32_4(SYSCALL_GET_MESSAGE | (args << 8), (uint32_t)port, port >> 32, (unsigned)buff, max_size);
 #else
-    result = syscall2(SYSCALL_GET_MESSAGE | (args << 8), port, reinterpret_cast<uintptr_t>(buff));
+    result = syscall3(SYSCALL_GET_MESSAGE | (args << 8), port, reinterpret_cast<uintptr_t>(buff), max_size);
 #endif
     return (right_request_t) {
         .result = static_cast<result_t>(result.result),

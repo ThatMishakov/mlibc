@@ -93,7 +93,7 @@ int Sysdeps<Openpt>::operator()(int oflags, int *fd) {
     });
 
     IPC_Open_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -154,7 +154,7 @@ int Sysdeps<Unlockpt>::operator()(int fd) {
     __ensure(result == SUCCESS);
 
     IPC_Unlockpt_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -201,7 +201,7 @@ int Sysdeps<Ttyname>::operator()(int fd, char *buff, size_t size) {
     __ensure(result == SUCCESS);
 
     auto *reply = reinterpret_cast<IPC_Ttyname_Reply *>(alloca(reply_descr.size));
-    result = get_first_message(reinterpret_cast<char *>(reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(reply), reply_descr.size, MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -262,7 +262,7 @@ static int create_new_process(uint64_t child_task_id, pid_t *child_pid, pmos_rig
     });
 
     IPC_Register_Process_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -399,7 +399,7 @@ int Sysdeps<SetSid>::operator()(pid_t *out) {
     __ensure(result == SUCCESS);
 
     IPC_Setid_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -435,7 +435,7 @@ int Sysdeps<SetPgid>::operator()(pid_t pid, pid_t pgid) {
     __ensure(result == SUCCESS);
 
     IPC_Setid_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -561,7 +561,7 @@ int Sysdeps<Execve>::operator()(const char *path, char *const argv[], char *cons
     __ensure(result == SUCCESS);
 
     IPC_Execve_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -591,7 +591,7 @@ static uint32_t get_id_generic(uint16_t id_type) {
     __ensure(result == SUCCESS);
 
     IPC_Get_ID_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     __ensure(reply_descr.size >= sizeof(IPC_Generic_Msg));
@@ -677,7 +677,7 @@ int Sysdeps<Pipe>::operator()(int *fds, int flags) {
     });
 
     IPC_Pipe_Open_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -788,7 +788,7 @@ static int get_id_for_generic(uint16_t id_type, pid_t pid, pid_t *id) {
     __ensure(result == SUCCESS);
 
     IPC_Get_ID_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -870,7 +870,7 @@ int Sysdeps<Tcgetattr>::operator()(int fd, struct termios *attr){
     __ensure(result == SUCCESS);
 
     IPC_Tcgetattr_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -1073,7 +1073,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
         poll_entries[idx].receive_right.release();
 
         IPC_Poll_Reply reply;
-        auto fr = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port);
+        auto fr = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port);
         __ensure(fr.result == SUCCESS);
 
         if (reply_descr.size < sizeof(IPC_Generic_Msg)) {
@@ -1127,7 +1127,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
 
     unsigned idx = find_idx(reply_descr.sent_with_right);
     IPC_Poll_Reply reply;
-    auto fr = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port);
+    auto fr = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port);
     __ensure(fr.result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg)) {
@@ -1235,7 +1235,7 @@ int Sysdeps<Waitpid>::operator()(pid_t pid, int *status, int flags, struct rusag
     __ensure(result == SUCCESS);
 
     IPC_Waitpid_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -1275,7 +1275,7 @@ int Sysdeps<GetCwd>::operator()(char *buff, size_t size) {
     __ensure(result == SUCCESS);
 
     IPC_Getcwd_Reply *reply = (IPC_Getcwd_Reply *)alloca(reply_descr.size); 
-    result = get_first_message(reinterpret_cast<char *>(reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(reply), reply_descr.size, MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -1335,7 +1335,7 @@ int Sysdeps<Faccessat>::operator()(int dirfd, const char *pathname, int mode, in
     __ensure(result == SUCCESS);
 
     IPC_Faccessat_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -1389,7 +1389,7 @@ int Sysdeps<Kill>::operator()(pid_t pid, int signal) {
     __ensure(result == SUCCESS);
 
     IPC_Kill_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -1502,7 +1502,7 @@ int Sysdeps<ReadEntries>::operator()(int handle, void *buffer, size_t max_size, 
     __ensure(result == SUCCESS);
 
     IPC_Readdir_Reply *reply = (IPC_Readdir_Reply *)alloca(reply_descr.size);
-    result = get_first_message(reinterpret_cast<char *>(reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(reply), reply_descr.size, MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -1563,7 +1563,7 @@ int Sysdeps<Chdir>::operator()(const char *path) {
     __ensure(result == SUCCESS);
 
     IPC_Chdir_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -1607,7 +1607,7 @@ int Sysdeps<Fchdir>::operator()(int fd) {
     __ensure(result == SUCCESS);
 
     IPC_Chdir_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -1654,7 +1654,7 @@ int Sysdeps<Uname>::operator()(struct utsname *buf)
     __ensure(result == SUCCESS);
 
     IPC_Uname_Reply *reply = (IPC_Uname_Reply *)alloca(reply_descr.size);
-    result = get_first_message(reinterpret_cast<char *>(reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = get_first_message(reinterpret_cast<char *>(reply), reply_descr.size, MSG_ARG_REJECT_RIGHT, port).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
