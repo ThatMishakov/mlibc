@@ -8,7 +8,6 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <alloca.h>
-#include <mlibc/sysdeps-allocator.hpp>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <dirent.h>
@@ -64,12 +63,13 @@ int Sysdeps<Openpty>::operator()(int *mfd, int *sfd, char *name, const struct te
 }
 
 int Sysdeps<Openpt>::operator()(int oflags, int *fd) {
+    // TODO: Signal safety here
     IPC_Openpt message = {
         .type = IPC_Openpt_NUM,
         .flags = static_cast<uint32_t>(oflags),
     };
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -124,46 +124,12 @@ int Sysdeps<Openpt>::operator()(int oflags, int *fd) {
 }
 
 int Sysdeps<Unlockpt>::operator()(int fd) {
-    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
-        return EBADF;
+	int unlock = 0;
 
-    pmos_right_t op_right;
-    {
-        frg::unique_lock lock(filesystem_mutex);
-        op_right = open_files[fd].op_right;
-    }
+	if(int e = sysdep<Ioctl>(fd, TIOCSPTLCK, &unlock, nullptr); e)
+		return e;
 
-    if (op_right == INVALID_RIGHT)
-        return EBADF; 
-
-    IPC_Unlockpt message = {
-        .type = IPC_Unlockpt_NUM,
-        .flags = 0,
-    };
-
-    auto port = __pmos_prepare_reply_port();
-    if (port == INVALID_PORT)
-        return EIO;
-
-    auto send_result = send_message_right(op_right, port, &message, sizeof(message), nullptr, 0);
-    if (send_result.result != SUCCESS)
-        return -send_result.result;
-
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
-
-    IPC_Unlockpt_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
-
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
-        return EIO;
-
-    if (reply.type != IPC_Unlockpt_Reply_NUM)
-        return EIO;
-
-    return -reply.result_code;
+	return 0;
 }
 
 int Sysdeps<Ptsname>::operator()(int fd, char *buff, size_t size) {
@@ -171,40 +137,53 @@ int Sysdeps<Ptsname>::operator()(int fd, char *buff, size_t size) {
 }
 
 int Sysdeps<Ttyname>::operator()(int fd, char *buff, size_t size) {
-    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
-        return EBADF;
+    auto res = pmos::get_open_file(fd);
+    if (!res)
+        return res.error();
 
-    pmos_right_t op_right;
-    {
-        frg::unique_lock lock(filesystem_mutex);
-        op_right = open_files[fd].op_right;
-    }
-
-    if (op_right == INVALID_RIGHT)
+    if (res.value().op_right == INVALID_RIGHT)
         return EBADF;
+    auto op_right = res.value().op_right;
 
     IPC_Ttyname message = {
         .type = IPC_Ttyname_NUM,
         .flags = 0,
     };
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
-    auto send_result = send_message_right(op_right, port, &message, sizeof(message), nullptr, 0);
-    if (send_result.result != SUCCESS)
-        return -send_result.result;
+    pmos_right_t reply_right;
+    do {
+        auto send_result = send_message_right(op_right, port, &message, sizeof(message), nullptr, 0);
+        auto result = kernel_to_errno(send_result.result);
+        reply_right = send_result.right;
+        if (!result)
+            break;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
+        if (result != ENOENT)
+            return result;
 
-    auto *reply = reinterpret_cast<IPC_Ttyname_Reply *>(alloca(reply_descr.size));
-    result = get_first_message(reinterpret_cast<char *>(reply), reply_descr.size, MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+        auto res = pmos::get_open_file(fd);
+        __ensure(res);
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+        if (res.value().op_right == op_right || res.value().op_right == INVALID_RIGHT)
+            return EBADF;
+
+        op_right = res.value().op_right;
+    } while (true);
+
+    frg::vector<uint8_t, SysdepsAllocator> reply_data(getSysdepsAllocator());
+    if (auto result = mlibc::pmos::handle_get_message_right(port, reply_right, reply_data, false); !result)
+        return result.error();
+
+    if (auto result = mlibc::pmos::check_generic_errors({reply_data.begin(), reply_data.size()}); !result)
+        return result.error();
+
+    auto reply = reinterpret_cast<IPC_Ttyname_Reply *>(reply_data.data());
+
+    if (reply_data.size() < sizeof(IPC_Ttyname_Reply))
         return EIO;
 
     if (reply->type != IPC_Ttyname_Reply_NUM)
@@ -213,7 +192,7 @@ int Sysdeps<Ttyname>::operator()(int fd, char *buff, size_t size) {
     if (reply->result_code < 0)
         return -reply->result_code;
 
-    size_t name_length = reply_descr.size - sizeof(IPC_Ttyname_Reply);
+    size_t name_length = reply_data.size() - sizeof(IPC_Ttyname_Reply);
     if (name_length + 1 > size)
         return ERANGE;
 
@@ -229,7 +208,9 @@ static int create_new_process(uint64_t child_task_id, pid_t *child_pid, pmos_rig
         .flags = 0,
     };
 
-    auto port = __pmos_prepare_reply_port();
+    // TODO: Signal safety
+
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -382,7 +363,7 @@ int Sysdeps<Fork>::operator()(pid_t *child_pid) {
 }
 
 int Sysdeps<SetSid>::operator()(pid_t *out) {
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -394,15 +375,15 @@ int Sysdeps<SetSid>::operator()(pid_t *out) {
     if (send_result.result != SUCCESS)
         return -send_result.result;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
-
     IPC_Setid_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    if (auto result = pmos::handle_get_message_right(port, send_result.right, frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply)), bytes_read, true); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (auto result = pmos::check_generic_errors(frg::span<uint8_t>((uint8_t *)&reply, bytes_read)); !result)
+        return result.error();
+
+    if (bytes_read < sizeof(IPC_Setid_Reply))
         return EIO;
 
     if (reply.type != IPC_Setid_Reply_NUM)
@@ -416,7 +397,7 @@ int Sysdeps<SetSid>::operator()(pid_t *out) {
 }
 
 int Sysdeps<SetPgid>::operator()(pid_t pid, pid_t pgid) {
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -430,15 +411,15 @@ int Sysdeps<SetPgid>::operator()(pid_t pid, pid_t pgid) {
     if (send_result.result != SUCCESS)
         return -send_result.result;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
-
     IPC_Setid_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    if (auto result = pmos::handle_get_message_right(port, send_result.right, frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply)), bytes_read, true); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (auto result = pmos::check_generic_errors(frg::span<uint8_t>((uint8_t *)&reply, bytes_read)); !result)
+        return result.error();
+
+    if (bytes_read < sizeof(IPC_Setid_Reply))
         return EIO;
 
     if (reply.type != IPC_Setid_Reply_NUM)
@@ -519,6 +500,8 @@ int Sysdeps<Execve>::operator()(const char *path, char *const argv[], char *cons
         .data = {},
     };
 
+    // TODO: Signal safety here again...
+
     frg::vector<char, SysdepsAllocator> message_data(getSysdepsAllocator());
     message_data.resize(sizeof(message) + message.path_length + message.args_length + message.envs_length);
     auto ptr = message_data.data();
@@ -530,7 +513,7 @@ int Sysdeps<Execve>::operator()(const char *path, char *const argv[], char *cons
     ptr += message.args_length;
     memcpy(ptr, env_area.data(), message.envs_length);
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -580,21 +563,18 @@ static uint32_t get_id_generic(uint16_t id_type) {
         .id_type = id_type,
     };
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     __ensure(port != INVALID_PORT);
 
     auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
     __ensure(send_result.result == SUCCESS);
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
-
     IPC_Get_ID_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    auto result = pmos::handle_get_message_right(port, send_result.right, frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply)), bytes_read, true);
+    __ensure(result);
 
-    __ensure(reply_descr.size >= sizeof(IPC_Generic_Msg));
+    __ensure(bytes_read >= sizeof(IPC_Get_ID_Reply));
     __ensure(reply.type == IPC_Get_ID_Reply_NUM);
 
     __ensure(reply.result == 0);
@@ -652,7 +632,7 @@ int Sysdeps<Pipe>::operator()(int *fds, int flags) {
         .flags          = static_cast<uint32_t>(flags),
     };
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -660,14 +640,7 @@ int Sysdeps<Pipe>::operator()(int *fds, int flags) {
     if (send_result.result != SUCCESS)
         return -send_result.result;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
-
     pmos_right_t extra_rights[4] = {};
-    auto get_result = accept_rights(port, extra_rights);
-    __ensure(get_result == SUCCESS);
-
     frg::scope_exit delete_rights([&] {
         for (size_t i = 0; i < 4; ++i) {
             if (extra_rights[i] != INVALID_RIGHT) {
@@ -677,10 +650,14 @@ int Sysdeps<Pipe>::operator()(int *fds, int flags) {
     });
 
     IPC_Pipe_Open_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    if (auto result = mlibc::pmos::handle_get_message_right(port, send_result.right, frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply)), bytes_read, true, &extra_rights); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (auto result = mlibc::pmos::check_generic_errors(frg::span<uint8_t>((uint8_t *)&reply, bytes_read)); !result)
+        return result.error();
+
+    if (bytes_read < sizeof(IPC_Pipe_Open_Reply))
         return EIO;
 
     if (reply.type != IPC_Pipe_Open_Reply_NUM)
@@ -775,7 +752,7 @@ static int get_id_for_generic(uint16_t id_type, pid_t pid, pid_t *id) {
         .pid = pid,
     };
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -783,15 +760,15 @@ static int get_id_for_generic(uint16_t id_type, pid_t pid, pid_t *id) {
     if (send_result.result != SUCCESS)
         return -send_result.result;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
-
     IPC_Get_ID_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    if (auto result = mlibc::pmos::handle_get_message_right(port, send_result.right, frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply)), bytes_read, true); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (auto result = mlibc::pmos::check_generic_errors(frg::span<uint8_t>((uint8_t *)&reply, bytes_read)); !result)
+        return result.error();
+
+    if (bytes_read < sizeof(reply))
         return EIO;
 
     if (reply.type != IPC_Get_ID_Reply_NUM)
@@ -809,81 +786,32 @@ int Sysdeps<GetPgid>::operator()(pid_t pid, pid_t *pgid) {
 }
 
 extern "C" int get_fd_rights(int fd, pmos_right_t *op_right, pmos_right_t *io_right, unsigned *flags) {
-    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
-        return EBADF;
-
-    frg::unique_lock lock(filesystem_mutex);
-    if (open_files[fd].io_right == INVALID_RIGHT)
+    auto res = mlibc::pmos::get_open_file(fd);
+    if (!res)
+        return res.error();
+    if (res.value().io_right == INVALID_RIGHT)
         return EBADF;
 
     if (op_right)
-        *op_right = open_files[fd].op_right;
+        *op_right = res.value().op_right;
     if (io_right)
-        *io_right = open_files[fd].io_right;
+        *io_right = res.value().io_right;
     if (flags)
-        *flags = open_files[fd].flags;
+        *flags = res.value().flags;
 
     return 0;
 }
 
 int Sysdeps<Tcgetwinsize>::operator()(int fd, struct winsize *winsz) {
-	int result;
-	return sysdep<Ioctl>(fd, TIOCGWINSZ, winsz, &result);
+	return sysdep<Ioctl>(fd, TIOCGWINSZ, winsz, nullptr);
 }
 
 int Sysdeps<Tcsetwinsize>::operator()(int fd, const struct winsize *winsz) {
-	int result;
-	return sysdep<Ioctl>(fd, TIOCSWINSZ, const_cast<struct winsize *>(winsz), &result);
+	return sysdep<Ioctl>(fd, TIOCSWINSZ, const_cast<struct winsize *>(winsz), nullptr);
 }
 
 int Sysdeps<Tcgetattr>::operator()(int fd, struct termios *attr){
-    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
-        return EBADF;
-
-    if (!isatty(fd))
-        return ENOTTY;
-
-    uint64_t io_right;
-    {
-        frg::unique_lock lock(filesystem_mutex);
-        if (open_files[fd].io_right == INVALID_RIGHT)
-            return EBADF;
-
-        io_right = open_files[fd].io_right;
-    }
-
-    IPC_Tcgetattr message = {
-        .type = IPC_Tcgetattr_NUM,
-        .flags = 0,
-    };
-
-    auto port = __pmos_prepare_reply_port();
-    if (port == INVALID_PORT)
-        return EIO;
-
-    auto send_result = send_message_right(io_right, port, &message, sizeof(message), nullptr, 0);
-    if (send_result.result != SUCCESS)
-        return -send_result.result;
-
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
-
-    IPC_Tcgetattr_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
-
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
-        return EIO;
-
-    if (reply.type != IPC_Tcgetattr_Reply_NUM)
-        return EIO;
-
-    if (reply.result_code < 0)
-        return -reply.result_code;
-
-    memcpy(attr, &reply.termios, sizeof(struct termios));
-    return 0;
+    return sysdep<Ioctl>(fd, TCGETS, (void *)attr, nullptr);
 }
 
 int Sysdeps<Poll>::operator()(struct pollfd *fds, nfds_t count, int timeout, int *num_events) {
@@ -944,7 +872,7 @@ struct Poll_Entry {
 static int arm_timer(const struct timespec *timeout, pmos_right_t &out_right) {
     __ensure(timeout);
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -1007,7 +935,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
         }
     }
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -1222,7 +1150,7 @@ int Sysdeps<Waitpid>::operator()(pid_t pid, int *status, int flags, struct rusag
         .pid = pid,
     };
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -1230,15 +1158,15 @@ int Sysdeps<Waitpid>::operator()(pid_t pid, int *status, int flags, struct rusag
     if (send_result.result != SUCCESS)
         return -send_result.result;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
-
     IPC_Waitpid_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    if (auto result = pmos::handle_get_message_right(port, send_result.right, frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply)), bytes_read, false); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (auto result = pmos::check_generic_errors(frg::span<uint8_t>((uint8_t *)&reply, bytes_read)); !result)
+        return result.error();
+
+    if (bytes_read < sizeof(IPC_Waitpid_Reply))
         return EIO;
 
     if (reply.type != IPC_Waitpid_Reply_NUM)
@@ -1262,13 +1190,15 @@ int Sysdeps<GetCwd>::operator()(char *buff, size_t size) {
         .flags = 0,
     };
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
     auto send_result = send_message_right(__posix_server_right, port, &message, sizeof(message), nullptr, 0);
     if (send_result.result != SUCCESS)
         return -send_result.result;
+
+    // TODO: Signal safety
 
     Message_Descriptor reply_descr;
     auto result = syscall_get_message_info(&reply_descr, port, 0);
@@ -1304,19 +1234,19 @@ int Sysdeps<Access>::operator()(const char *path, int mode){
 int Sysdeps<Faccessat>::operator()(int dirfd, const char *pathname, int mode, int flags){
     auto right = __posix_server_right;
     if (dirfd != AT_FDCWD) {
-        if (dirfd < 0 || dirfd >= __MLIBC_OPEN_MAX)
+        auto res = pmos::get_open_file(dirfd);
+        if (!res)
+            return res.error();
+
+        if (res.value().op_right == INVALID_RIGHT)
             return EBADF;
 
-        frg::unique_lock lock(filesystem_mutex);
-        if (open_files[dirfd].io_right == INVALID_RIGHT)
-            return EBADF;
-
-        right = open_files[dirfd].op_right;
+        right = res.value().op_right;
     }
 
     auto len = strlen(pathname);
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -1326,19 +1256,37 @@ int Sysdeps<Faccessat>::operator()(int dirfd, const char *pathname, int mode, in
     message->mode = mode;
     memcpy(message->path, pathname, len);
 
-    auto send_result = send_message_right(right, port, reinterpret_cast<void *>(message), sizeof(IPC_Faccessat) + len, nullptr, 0);
-    if (send_result.result != SUCCESS)
-        return -send_result.result;
+    pmos_right_t reply_right;
+    do {
+        auto send_result = send_message_right(right, port, reinterpret_cast<void *>(message), sizeof(IPC_Faccessat) + len, nullptr, 0);
+        auto result = kernel_to_errno(send_result.result);
+        reply_right = send_result.right;
+        if (!result)
+            break;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
+        if (result != ENOENT)
+            return result;
+
+        if (dirfd == AT_FDCWD)
+            return EIO;
+
+        auto res = pmos::get_open_file(dirfd);
+        __ensure(res);
+
+        if (res.value().op_right == right || res.value().op_right == INVALID_RIGHT)
+            return EBADF;
+        right = res.value().op_right;
+    } while (true);
 
     IPC_Faccessat_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    if (auto result = mlibc::pmos::handle_get_message_right(port, reply_right, frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply)), bytes_read, true); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (auto result = mlibc::pmos::check_generic_errors(frg::span<uint8_t>((uint8_t *)&reply, bytes_read)); !result)
+        return result.error();
+
+    if (bytes_read < sizeof(IPC_Faccessat_Reply))
         return EIO;
 
     if (reply.type != IPC_Faccessat_Reply_NUM)
@@ -1376,7 +1324,7 @@ int Sysdeps<Kill>::operator()(pid_t pid, int signal) {
         .signal = signal,
     };
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -1384,15 +1332,15 @@ int Sysdeps<Kill>::operator()(pid_t pid, int signal) {
     if (send_result.result != SUCCESS)
         return -send_result.result;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
-
     IPC_Kill_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    if (auto result = pmos::handle_get_message_right(port, send_result.right, frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply)), bytes_read, true); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (auto result = pmos::check_generic_errors(frg::span<uint8_t>((uint8_t *)&reply, bytes_read)); !result)
+        return result.error();
+
+    if (bytes_read < sizeof(IPC_Kill_Reply))
         return EIO;
 
     if (reply.type != IPC_Kill_Reply_NUM)
@@ -1467,36 +1415,47 @@ int Sysdeps<OpenDir>::operator()(const char *path, int *fd) {
 }
 
 int Sysdeps<ReadEntries>::operator()(int handle, void *buffer, size_t max_size, size_t *bytes_read) {
-    if (handle >= __MLIBC_OPEN_MAX || handle < 0)
+    auto res = pmos::get_open_file(handle);
+    if (!res)
+        return res.error();
+
+    if (res.value().io_right == INVALID_RIGHT)
         return EBADF;
 
-    if (max_size < sizeof(struct dirent))
-        return EINVAL;
-
-    pmos_right_t io_right;
-    unsigned flags;
-    {
-        frg::unique_lock lock(filesystem_mutex);
-        if (open_files[handle].io_right == INVALID_RIGHT)
-            return EBADF;
-
-        io_right = open_files[handle].io_right;
-        flags = open_files[handle].flags;
-    }
+    auto io_right = res.value().io_right;
 
     IPC_Readdir message = {
         .type = IPC_Readdir_NUM,
-        .flags = flags,
+        .flags = res.value().flags,
     };
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
-    auto send_result = send_message_right(io_right, port, &message, sizeof(message), nullptr, 0);
-    if (send_result.result != SUCCESS)
-        return -send_result.result;
+    pmos_right_t reply_right;
+    do {
+        auto send_result = send_message_right(io_right, port, &message, sizeof(message), nullptr, 0);
+        auto result = kernel_to_errno(send_result.result);
+        reply_right = send_result.right;
+        if (!result)
+            break;
 
+        if (result != ENOENT)
+            return result;
+
+        auto res = pmos::get_open_file(handle);
+        __ensure(res);
+
+        if (res.value().io_right == io_right || res.value().io_right == INVALID_RIGHT)
+            return EBADF;
+
+        io_right = res.value().io_right;
+        message.flags = res.value().flags;
+    } while (true);
+
+    (void)reply_right;
+    // TODO: Signal safety here...
     Message_Descriptor reply_descr;
     auto result = syscall_get_message_info(&reply_descr, port, 0);
     __ensure(result == SUCCESS);
@@ -1544,7 +1503,7 @@ int Sysdeps<ReadEntries>::operator()(int handle, void *buffer, size_t max_size, 
 int Sysdeps<Chdir>::operator()(const char *path) {
     auto right = __posix_server_right;
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -1558,15 +1517,15 @@ int Sysdeps<Chdir>::operator()(const char *path) {
     if (send_result.result != SUCCESS)
         return -send_result.result;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
-
     IPC_Chdir_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    if (auto result = mlibc::pmos::handle_get_message_right(port, send_result.right, frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply)), bytes_read, true); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (auto result = mlibc::pmos::check_generic_errors(frg::span<uint8_t>((uint8_t *)&reply, bytes_read)); !result)
+        return result.error();
+
+    if (bytes_read < sizeof(IPC_Chdir_Reply))
         return EIO;
 
     if (reply.type != IPC_Chdir_Reply_NUM)
@@ -1576,17 +1535,13 @@ int Sysdeps<Chdir>::operator()(const char *path) {
 }
 
 int Sysdeps<Fchdir>::operator()(int fd) {
-    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+    auto res = mlibc::pmos::get_open_file(fd);
+    if (!res)
+        return res.error();
+
+    pmos_right_t op_right = res.value().op_right;
+    if (op_right == INVALID_RIGHT)
         return EBADF;
-
-    pmos_right_t op_right;
-    {
-        frg::unique_lock lock(filesystem_mutex);
-        if (open_files[fd].op_right == INVALID_RIGHT)
-            return EBADF;
-
-        op_right = open_files[fd].op_right;
-    }
 
     IPC_Chdir message = {
         .type = IPC_Chdir_NUM,
@@ -1594,23 +1549,40 @@ int Sysdeps<Fchdir>::operator()(int fd) {
         .path = {},
     };
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
-    auto send_result = send_message_right(op_right, port, reinterpret_cast<void *>(&message), sizeof(message), nullptr, 0);
-    if (send_result.result != SUCCESS)
-        return -send_result.result;
+    pmos_right_t reply_right;
+    do {
+        auto send_result = send_message_right(op_right, port, reinterpret_cast<void *>(&message), sizeof(message), nullptr, 0);
+        auto result = kernel_to_errno(send_result.result);
+        reply_right = send_result.right;
+        if (!result)
+            break;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
+        if (result != ENOENT)
+            return result;
+
+        auto res = mlibc::pmos::get_open_file(fd);
+        __ensure(res);
+
+        if (res.value().op_right == op_right || res.value().op_right == INVALID_RIGHT)
+            return EBADF;
+
+        op_right = res.value().op_right;
+    } while (true);
+
 
     IPC_Chdir_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    if (auto result = mlibc::pmos::handle_get_message_right(port, reply_right, frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply)), bytes_read, true); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (auto result = mlibc::pmos::check_generic_errors(frg::span<uint8_t>((uint8_t *)&reply, bytes_read)); !result)
+        return result.error();
+
+    if (bytes_read < sizeof(IPC_Chdir_Reply))
         return EIO;
 
     if (reply.type != IPC_Chdir_Reply_NUM)
@@ -1636,12 +1608,14 @@ int Sysdeps<GetHostname>::operator()(char *buf, size_t bufsize)
 
 int Sysdeps<Uname>::operator()(struct utsname *buf)
 {
+    // TODO: Signal safety here
+
     IPC_Uname message = {
         .type = IPC_Uname_NUM,
         .flags = 0,
     };
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 

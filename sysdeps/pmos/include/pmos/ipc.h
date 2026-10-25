@@ -753,27 +753,6 @@ typedef struct IPC_Close {
     uint64_t file_id;
 } IPC_Close;
 
-#define IPC_Tcgetattr_NUM 0x5d
-typedef struct IPC_Tcgetattr {
-    /// Message type (must be IPC_Tcgetattr_NUM)
-    uint32_t type;
-
-    /// Flags changing the behavior of the tcgetattr operation
-    uint32_t flags;
-} IPC_Tcgetattr;
-
-#define IPC_Tcgetattr_Reply_NUM 0x5e
-typedef struct IPC_Tcgetattr_Reply {
-    /// Message type (must be IPC_Tcgetattr_Reply_NUM)
-    uint32_t type;
-
-    /// Result code indicating the outcome of the tcgetattr operation
-    int32_t result_code;
-
-    /// Termios structure containing the terminal attributes
-    struct termios termios;
-} IPC_Tcgetattr_Reply;
-
 #define IPC_Waitpid_NUM 0x5f
 typedef struct IPC_Waitpid {
     /// Message type (must be IPC_Waitpid_NUM)
@@ -1198,27 +1177,6 @@ typedef struct IPC_Openpt {
     /// Flags (as passed by the posix_openpt() call)
     uint32_t flags;
 } IPC_Openpt;
-
-#define IPC_Unlockpt_NUM 0xE3
-typedef struct IPC_Unlockpt {
-    /// Message type (must be IPC_Unlockpt_NUM)
-    uint32_t type;
-
-    /// Flags
-    uint32_t flags;
-} IPC_Unlockpt;
-
-#define IPC_Unlockpt_Reply_NUM 0xE4
-typedef struct IPC_Unlockpt_Reply {
-    /// Message type (must be IPC_Unlockpt_Reply_NUM)
-    uint32_t type;
-
-    /// Result code indicating the outcome of the unlock operation
-    int16_t result_code;
-
-    /// Flags
-    uint16_t flags;
-} IPC_Unlockpt_Reply;
 
 #define IPC_Ttyname_NUM 0xE5
 typedef struct IPC_Ttyname {

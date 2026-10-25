@@ -53,7 +53,8 @@ right_request_t request_named_port(const char *name, size_t length, pmos_port_t 
 
 right_request_t get_right_by_name(const char *name, size_t length, uint32_t flags)
 {
-    pmos_port_t reply_port = __pmos_prepare_reply_port();
+    // TODO: Signal safety here again...
+    pmos_port_t reply_port = mlibc::pmos::prepare_reply_port();
     if (reply_port == INVALID_PORT) {
         return (right_request_t) {
             .result = static_cast<result_t>(-ENOMEM),
@@ -109,12 +110,13 @@ right_request_t get_right_by_name(const char *name, size_t length, uint32_t flag
 
 result_t name_right(pmos_right_t right, const char *name, size_t length, uint32_t flags)
 {
+    // TODO: Signal safety
     result_t result            = 0;
     IPC_Generic_Msg *reply_msg = NULL;
     IPC_Name_Right_Reply *reply = NULL;
     result_t k_result;
 
-    pmos_port_t reply_port = __pmos_prepare_reply_port();
+    pmos_port_t reply_port = mlibc::pmos::prepare_reply_port();
     if (reply_port == INVALID_PORT) {
         return -ENOMEM;
     }

@@ -1,6 +1,5 @@
 #include <mlibc/debug.hpp>
 #include <mlibc/all-sysdeps.hpp>
-#include <mlibc/sysdeps-allocator.hpp>
 
 #include <frg/array.hpp>
 #include <frg/scope_exit.hpp>
@@ -17,6 +16,8 @@
 #include <sys/mman.h>
 #include <alloca.h>
 #include <fcntl.h>
+
+#include <utility>
 
 #include "common.hpp"
 
@@ -146,43 +147,52 @@ int Sysdeps<Close>::operator()(int fd) {
 }
 
 int Sysdeps<Write>::operator()(int fd, const void *buff, size_t count, ssize_t *bytes_written) {
-    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
-        return EBADF;
+    auto res = mlibc::pmos::get_open_file(fd);
+    if (!res)
+        return res.error();
 
-    pmos_right_t io_right;
-    {
-        frg::unique_lock lock(filesystem_mutex);
-        io_right = open_files[fd].io_right;
-    }
-
+    pmos_right_t io_right = res.value().io_right;
     if (io_right == INVALID_RIGHT)
         return EBADF;
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = mlibc::pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
     IPC_Write *write_msg = (IPC_Write *)alloca(sizeof(IPC_Write) + count);
     write_msg->type = IPC_Write_NUM;
-    write_msg->flags = flags_to_io(open_files[fd].flags);
+    write_msg->flags = flags_to_io(res.value().flags);
     write_msg->offset = 0;
     memcpy(write_msg->data, buff, count);
 
-    auto send_result = send_message_right(io_right, port, write_msg, sizeof(IPC_Write) + count, nullptr, 0);
-    if (send_result.result != SUCCESS)
-        return kernel_to_errno(send_result.result);
+    pmos_right_t reply_right;
+    do {
+        auto send_result = send_message_right(io_right, port, write_msg, sizeof(IPC_Write) + count, nullptr, 0);
+        auto result = kernel_to_errno(send_result.result);
+        reply_right = send_result.right;
+        if (!result)
+            break;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    // TODO: Handle EINTR
-    __ensure(result == SUCCESS);
+        if (result != ENOENT)
+            return result;
+
+        auto res = mlibc::pmos::get_open_file(fd);
+        __ensure(res);
+
+        if (res.value().io_right == io_right || res.value().io_right == INVALID_RIGHT)
+            return EBADF;
+        io_right = res.value().io_right;
+        write_msg->flags = flags_to_io(res.value().flags);
+    } while (true);
 
     IPC_Write_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    auto span = frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply));
+    if (auto result = mlibc::pmos::handle_get_message_right(port, reply_right, span, bytes_read, false); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
-        return EIO;
+    if (auto result = mlibc::pmos::check_generic_errors(span.subspan(0, bytes_read)); !result)
+        return result.error();
 
     if (reply.type != IPC_Write_Reply_NUM)
         return EIO;
@@ -192,45 +202,52 @@ int Sysdeps<Write>::operator()(int fd, const void *buff, size_t count, ssize_t *
 }
 
 int Sysdeps<Read>::operator()(int fd, void *buff, size_t count, ssize_t *bytes_read) {
-    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
-        return EBADF;
+    auto res = mlibc::pmos::get_open_file(fd);
+    if (!res)
+        return res.error();
 
-    pmos_right_t io_right;
-    {
-        frg::unique_lock lock(filesystem_mutex);
-        io_right = open_files[fd].io_right;
-    }
-
+    pmos_right_t io_right = res.value().io_right;
     if (io_right == INVALID_RIGHT)
         return EBADF;
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = mlibc::pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
     IPC_Read read_msg = {
         .type = IPC_Read_NUM,
-        .flags = flags_to_io(open_files[fd].flags),
+        .flags = flags_to_io(res.value().flags),
         .start_offset = 0, // This is ignored since there's no fixed offset flag set
         .max_size = count,
     };
 
-    auto send_result = send_message_right(io_right, port, &read_msg, sizeof(read_msg), nullptr, 0);
-    if (send_result.result != SUCCESS)
-        return kernel_to_errno(send_result.result);
+    pmos_right_t reply_right;
+    do {
+        auto send_result = send_message_right(io_right, port, &read_msg, sizeof(read_msg), nullptr, 0);
+        auto result = kernel_to_errno(send_result.result);
+        reply_right = send_result.right;
+        if (!result)
+            break;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    // TODO: Handle EINTR (as above)
-    __ensure(result == SUCCESS);
+        if (result != ENOENT)
+            return result;
+
+        auto res = mlibc::pmos::get_open_file(fd);
+        __ensure(res);
+
+        if (res.value().io_right == io_right || res.value().io_right == INVALID_RIGHT)
+            return EBADF;
+
+        io_right = res.value().io_right;
+        read_msg.flags = flags_to_io(res.value().flags);
+    } while (true);
 
     frg::vector<uint8_t, SysdepsAllocator> reply_data(getSysdepsAllocator());
-    reply_data.resize(reply_descr.size);
-    result = get_first_message(reinterpret_cast<char *>(reply_data.data()), reply_descr.size, MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    if (auto result = mlibc::pmos::handle_get_message_right(port, reply_right, reply_data, false); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
-        return EIO;
+    if (auto result = mlibc::pmos::check_generic_errors({reply_data.begin(), reply_data.size()}); !result)
+        return result.error();
 
     IPC_Read_Reply *reply = (IPC_Read_Reply *)reply_data.data();
 
@@ -240,22 +257,20 @@ int Sysdeps<Read>::operator()(int fd, void *buff, size_t count, ssize_t *bytes_r
     if (reply->result_code)
         return -reply->result_code;
 
-    *bytes_read = reply_descr.size - sizeof(IPC_Read_Reply);
+    *bytes_read = reply_data.size() - sizeof(IPC_Read_Reply);
     memcpy(buff, reply->data, *bytes_read);
     return 0;
 }
 
 int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offset) {
-    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
-        return EBADF;
+    auto res = mlibc::pmos::get_open_file(fd);
+    if (!res)
+        return res.error();
 
-    pmos_right_t io_right;
-    unsigned flags;
-    {
-        frg::unique_lock lock(filesystem_mutex);
-        io_right = open_files[fd].io_right;
-        flags = open_files[fd].flags;
-    }
+    pmos_right_t io_right = res.value().io_right;
+    auto flags = res.value().flags;
+    if (io_right == INVALID_RIGHT)
+        return EBADF;
 
     if (io_right == INVALID_RIGHT)
         return EBADF;
@@ -263,7 +278,7 @@ int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offse
     if (flags & (FLAG_ISPIPE | FLAG_ISATTY))
         return ESPIPE;
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = mlibc::pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -274,22 +289,37 @@ int Sysdeps<Seek>::operator()(int fd, off_t offset, int whence, off_t *new_offse
         .offset = offset,
     };
     
-    auto send_result = send_message_right(io_right, port, &seek_msg, sizeof(seek_msg), nullptr, 0);
-    if (send_result.result != SUCCESS)
-        return -send_result.result;
+    pmos_right_t reply_right;
+    do {
+        auto send_result = send_message_right(io_right, port, &seek_msg, sizeof(seek_msg), nullptr, 0);
+        auto result = kernel_to_errno(send_result.result);
+        reply_right = send_result.right;
+        if (!result)
+            break;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
+        if (result != ENOENT)
+            return result;
+
+        auto res = mlibc::pmos::get_open_file(fd);
+        __ensure(res);
+
+        if (res.value().io_right == io_right || res.value().io_right == INVALID_RIGHT)
+            return EBADF;
+        io_right = res.value().io_right;
+    } while (true);
 
     IPC_Seek_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    if (auto result = mlibc::pmos::handle_get_message_right(port, reply_right, frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply)), bytes_read, true); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
-        return EIO;
+    if (auto result = mlibc::pmos::check_generic_errors(frg::span<uint8_t>((uint8_t *)&reply, bytes_read)); !result)
+        return result.error();
 
     if (reply.type != IPC_Seek_Reply_NUM)
+        return EIO;
+
+    if (bytes_read < sizeof(reply))
         return EIO;
 
     *new_offset = static_cast<off_t>(reply.new_offset);
@@ -307,7 +337,8 @@ int Sysdeps<Open>::operator()(const char *pathname, int flags, mode_t mode, int 
     message->flags = flags | mode;
     memcpy(message->path, pathname, path_len);
 
-    auto port = __pmos_prepare_reply_port();
+    // TODO: Signal safety here...
+    auto port = mlibc::pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -362,16 +393,14 @@ int Sysdeps<Open>::operator()(const char *pathname, int flags, mode_t mode, int 
 }
 
 int Sysdeps<Isatty>::operator()(int fd) {
+    auto file = mlibc::pmos::get_open_file(fd);
+    if (!file)
+        return file.error();
 
-    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+    if (file.value().io_right == INVALID_RIGHT)
         return EBADF;
 
-    const auto &file = open_files[fd];
-    frg::unique_lock lock(filesystem_mutex);
-    if (file.io_right == INVALID_RIGHT)
-        return EBADF;
-
-    if (!(file.flags & FLAG_ISATTY))
+    if (!(file.value().flags & FLAG_ISATTY))
         return ENOTTY;
 
     return 0;
@@ -382,6 +411,7 @@ int Sysdeps<Recvfrom>::operator()(int , void *, size_t , int , struct sockaddr *
 }
 
 int Sysdeps<Dup2>::operator()(int fd, int flags, int newfd) {
+    // TODO: Signal safety here
     if (fd >= __MLIBC_OPEN_MAX || fd < 0)
         return EBADF;
     if (newfd >= __MLIBC_OPEN_MAX || newfd < 0)
@@ -427,6 +457,7 @@ int Sysdeps<Dup2>::operator()(int fd, int flags, int newfd) {
 }
 
 int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int fd, off_t offset, void **window) {
+    // TODO: Signal safety here
     unsigned map_flags = prot | mmap_flags_to_kernel(flags);
 
     if (flags & MAP_ANON) {
@@ -450,7 +481,7 @@ int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int
     if (io_right == INVALID_RIGHT)
         return EBADF;
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = mlibc::pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -533,32 +564,28 @@ int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int f
     if (!statbuf)
         return EINVAL;
 
-    pmos_right_t file_right;
+    auto stat_right = [=]() -> frg::expected<int, std::pair<pmos_right_t, unsigned /* flags */>> {
+        unsigned flags = 0;
+        switch (fsfdt) {
+            case fsfd_target::path:
+                return std::pair<pmos_right_t, unsigned>(__posix_server_right, 0);
+            case fsfd_target::fd:
+                flags = AT_EMPTY_PATH;
+                [[fallthrough]];
 
-    switch (fsfdt) {
-        case fsfd_target::path:
-            file_right = __posix_server_right;
-            break;
-        case fsfd_target::fd:
-            flags = AT_EMPTY_PATH;
-            [[fallthrough]];
+            case fsfd_target::fd_path: {
+                auto res = mlibc::pmos::get_open_file(fd);
+                if (!res)
+                    return res.error();
 
-        case fsfd_target::fd_path:
-            if (fd >= __MLIBC_OPEN_MAX || fd < 0)
-                return EBADF;
-            
-            {
-                frg::unique_lock lock(filesystem_mutex);
-                file_right = open_files[fd].op_right;
+                return std::pair<pmos_right_t, unsigned>(res.value().op_right, flags);
             }
-            if (file_right == INVALID_RIGHT)
-                return EBADF;
-            break;
-        default:
-            return ENOSYS;
-    }
+            default:
+                return ENOSYS;
+        }
+    };
 
-    auto port = __pmos_prepare_reply_port();
+    auto port = mlibc::pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
 
@@ -569,22 +596,45 @@ int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int f
     message->flags = flags;
     memcpy(message->path, path, path_len);
 
-    auto send_result = send_message_right(file_right, port, message, message_size, nullptr, 0);
-    if (send_result.result != SUCCESS)
-        return -send_result.result;
+    auto right_result = stat_right();
+    if (!right_result)
+        return right_result.error();
+    if (right_result.value().first == INVALID_RIGHT)
+        return EBADF;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
+    pmos_right_t reply_right;
+    do {
+        auto send_result = send_message_right(right_result.value().first, port, message, message_size, nullptr, 0);
+        auto result = kernel_to_errno(send_result.result);
+        reply_right = send_result.right;
+        if (!result)
+            break;
+
+        if (result != ENOENT)
+            return result;
+
+        auto res = stat_right();
+        __ensure(res);
+
+        if (res.value().first == right_result.value().first || res.value().first == INVALID_RIGHT)
+            return EBADF;
+
+        right_result = std::move(res);
+        message->flags = right_result.value().second;
+    } while (true);
 
     IPC_Stat_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
-
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
-        return EIO;
+    size_t bytes_read;
+    auto span = frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply));
+    if (auto result = mlibc::pmos::handle_get_message_right(port, reply_right, span, bytes_read, true); !result)
+        return result.error();
+    if (auto result = mlibc::pmos::check_generic_errors(span.subspan(0, bytes_read)); !result)
+        return result.error();
 
     if (reply.type != IPC_Stat_Reply_NUM)
+        return EIO;
+
+    if (bytes_read < sizeof(IPC_Stat_Reply))
         return EIO;
 
     if (reply.result < 0)
@@ -610,11 +660,12 @@ int Sysdeps<Stat>::operator()(fsfd_target fsfdt, int fd, const char *path, int f
 
 }
 
-pmos_port_t __pmos_prepare_reply_port()
+pmos_port_t mlibc::pmos::prepare_reply_port()
 {
     auto tcb = mlibc::get_current_tcb();
     auto &port = tcb->sysdepData.threadPort;
 
+    // TODO: Signal safety here
     if (port != INVALID_PORT)
         return port;
 
@@ -622,4 +673,92 @@ pmos_port_t __pmos_prepare_reply_port()
     __ensure(port_request.result == SUCCESS);
     
     return port = port_request.port;
+}
+
+frg::expected<int, mlibc::OpenFile> mlibc::pmos::get_open_file(int fd)
+{
+    // TODO: Signal safety here
+    if (fd >= __MLIBC_OPEN_MAX || fd < 0)
+        return EBADF;
+
+    frg::unique_lock lock(mlibc::filesystem_mutex);
+    return mlibc::open_files[fd];
+}
+
+frg::expected<int, void> mlibc::pmos::check_generic_errors(frg::span<uint8_t> reply_data, bool check_closed_right) {
+    if (reply_data.size() < sizeof(IPC_Generic_Msg))
+        return EIO;
+
+    if (reply_data.size() >= sizeof(IPC_Generic_Result)) {
+        auto result = (IPC_Generic_Result *)reply_data.data();
+        if (result->type == IPC_Generic_Result_NUM && result->result < 0)
+            return -result->result;
+    }
+
+    if (reply_data.size() >= sizeof(IPC_Kernel_Receive_Right_Destroyed)) {
+        auto msg = (IPC_Kernel_Receive_Right_Destroyed *)reply_data.data();
+        if (check_closed_right && msg->type == IPC_Kernel_Receive_Right_Destroyed_NUM)
+            return ECONNRESET;
+    }
+
+    return {};
+}
+
+namespace {
+
+frg::expected<int> handle_get_message_generic(pmos_port_t port, pmos_right_t right, auto &container, size_t &bytes_written, bool always_restart, pmos_right_t (*extra_rights)[4]) {
+    bool accepted_rights = false;
+    do {
+        Message_Descriptor reply_descr;
+        auto result = syscall_get_message_info(&reply_descr, port, 0);
+        if (result == -EINTR) {
+            if (always_restart)
+                continue;
+
+            auto result = delete_receive_right(port, right, 0);
+            if (result == -ENOMSG)
+                // Message was already recieved
+                continue;
+
+            if (result == SUCCESS)
+                return -EINTR;
+
+            return kernel_to_errno(result);
+        } else if (result != SUCCESS)
+            return kernel_to_errno(result);
+
+        if constexpr (std::is_same_v<frg::vector<uint8_t, SysdepsAllocator>, std::remove_cvref_t<decltype(container)>>)
+            if (container.size() != reply_descr.size)
+                container.resize(reply_descr.size);
+
+        if (extra_rights && !accepted_rights) {
+            auto get_result = accept_rights(port, *extra_rights);
+            if (get_result == -EINTR)
+                continue;
+            if (get_result != SUCCESS)
+                return kernel_to_errno(get_result);
+            accepted_rights = true;
+        }
+
+        auto get_result = get_first_message((char *)container.data(), container.size(), MSG_ARG_REJECT_RIGHT, port);
+        if (get_result.result == -EINTR)
+            continue;
+
+        bytes_written = std::min<size_t>(reply_descr.size, container.size());
+
+        if (get_result.result != SUCCESS)
+            return kernel_to_errno(get_result.result);
+        return frg::success;
+    } while (true);
+}
+
+}
+
+frg::expected<int, void> mlibc::pmos::handle_get_message_right(pmos_port_t port, pmos_right_t right, frg::vector<uint8_t, SysdepsAllocator> &out_buffer, bool always_restart, pmos_right_t (*extra_rights)[4]) {
+    size_t bytes_read;
+    return handle_get_message_generic(port, right, out_buffer, bytes_read, always_restart, extra_rights);
+}
+
+frg::expected<int, void> mlibc::pmos::handle_get_message_right(pmos_port_t port, pmos_right_t right, frg::span<uint8_t> out_buffer, size_t &bytes_read, bool always_restart, pmos_right_t (*extra_rights)[4]) {
+    return handle_get_message_generic(port, right, out_buffer, bytes_read, always_restart, extra_rights);
 }

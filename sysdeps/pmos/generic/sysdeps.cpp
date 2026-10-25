@@ -10,8 +10,7 @@
 
 #include <mlibc/debug.hpp>
 #include <mlibc/tcb.hpp>
-
-#include <mlibc/sysdeps-allocator.hpp>
+#include "sysdeps-allocator.hpp"
 
 SysdepAllocatorCapability sysdepAllocatorCapability;
 

@@ -9,6 +9,10 @@
 #include <mlibc/threads.hpp>
 #include <frg/array.hpp>
 #include <mlibc/lock.hpp>
+#include <frg/expected.hpp>
+#include <frg/span.hpp>
+#include <frg/vector.hpp>
+#include "sysdeps-allocator.hpp"
 
 namespace mlibc::pmos {
 
@@ -16,8 +20,6 @@ extern uint64_t __process_task_group;
 extern pmos_right_t __posix_server_right;
 
 }
-
-pmos_port_t __pmos_prepare_reply_port();
 
 namespace {
 
@@ -91,5 +93,20 @@ struct OpenFile {
 
 extern FutexLock filesystem_mutex;
 extern frg::array<OpenFile, __MLIBC_OPEN_MAX> open_files;
+
+[[gnu::visibility("hidden")]]
+frg::expected<int, OpenFile> get_open_file(int fd);
+
+[[gnu::visibility("hidden")]]
+pmos_port_t prepare_reply_port();
+
+[[gnu::visibility("hidden")]]
+frg::expected<int, void> handle_get_message_right(pmos_port_t port, pmos_right_t right, frg::span<uint8_t> out_buffer, size_t &bytes_read, bool always_restart = false, pmos_right_t (*extra_rights)[4] = nullptr);
+
+[[gnu::visibility("hidden")]]
+frg::expected<int, void> handle_get_message_right(pmos_port_t port, pmos_right_t right, frg::vector<uint8_t, SysdepsAllocator> &out_buffer, bool always_restart = false, pmos_right_t (*extra_rights)[4] = nullptr);
+
+[[gnu::visibility("hidden")]]
+frg::expected<int, void> check_generic_errors(frg::span<uint8_t> reply_data, bool check_closed_right = true);
 
 } // namespace mlibc::pmos
