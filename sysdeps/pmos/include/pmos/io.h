@@ -149,45 +149,45 @@ inline void mmio_writed(uint64_t *ptr, uint64_t data)
 
 inline void mmio_writeb(uint8_t *ptr, uint8_t data)
 {
-    asm volatile("st.b %0, %1" :: "r"(data), "o"(*ptr): "memory");
+    asm volatile("st.b %1, %0" : "=m"(*ptr) : "r"(data) : "memory");
 }
 
 inline void mmio_writeh(uint16_t *ptr, uint16_t data)
 {
-    asm volatile("st.h %0, %1" :: "r"(data), "o"(*ptr): "memory");
+    asm volatile("st.h %1, %0" : "=m"(*ptr) : "r"(data) : "memory");
 }
 inline void mmio_writel(uint32_t *ptr, uint32_t data)
 {
-    asm volatile("st.w %0, %1" :: "r"(data), "o"(*ptr): "memory");
+    asm volatile("st.w %1, %0" : "=m"(*ptr) : "r"(data) : "memory");
 }
 inline void mmio_writed(uint64_t *ptr, uint64_t data)
 {
-    asm volatile("st.d %0, %1" :: "r"(data), "o"(*ptr) : "memory");
+    asm volatile("st.d %1, %0" : "=m"(*ptr) : "r"(data) : "memory");
 }
 
 
 inline uint8_t mmio_readb(uint8_t *ptr)
 {
     uint8_t data;
-    asm volatile ("ld.b %0, %1" : "=r"(data) : "o"(*ptr) : "memory");
+    asm volatile ("ld.b %0, %1" : "=r"(data) : "m"(*ptr) : "memory");
     return data;
 }
 inline uint16_t mmio_readh(uint16_t *ptr)
 {
     uint16_t data;
-    asm volatile ("ld.h %0, %1" : "=r"(data) : "o"(*ptr) : "memory");
+    asm volatile ("ld.h %0, %1" : "=r"(data) : "m"(*ptr) : "memory");
     return data;
 }
 inline uint32_t mmio_readl(uint32_t *ptr)
 {
     uint32_t data;
-    asm volatile ("ld.w %0, %1" : "=r"(data) : "o"(*ptr): "memory");
+    asm volatile ("ld.w %0, %1" : "=r"(data) : "m"(*ptr): "memory");
     return data;
 }
 inline uint64_t mmio_readd(uint64_t *ptr)
 {
     uint64_t data;
-    asm volatile ("ld.d %0, %1" : "=r"(data) : "o"(*ptr): "memory");
+    asm volatile ("ld.d %0, %1" : "=r"(data) : "m"(*ptr): "memory");
     return data;
 }
 
