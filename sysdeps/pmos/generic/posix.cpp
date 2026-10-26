@@ -77,13 +77,7 @@ int Sysdeps<Openpt>::operator()(int oflags, int *fd) {
     if (send_result.result != SUCCESS)
         return -send_result.result;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
-
     pmos_right_t extra_rights[4] = {};
-    auto get_result = accept_rights(port, extra_rights);
-    __ensure(get_result == SUCCESS);
     frg::scope_exit delete_rights([&] {
         for (size_t i = 0; i < 4; ++i) {
             if (extra_rights[i] != INVALID_RIGHT) {
@@ -93,10 +87,14 @@ int Sysdeps<Openpt>::operator()(int oflags, int *fd) {
     });
 
     IPC_Open_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    if (auto result = mlibc::pmos::handle_get_message_right(port, send_result.right, frg::span<uint8_t>{reinterpret_cast<uint8_t*>(&reply), sizeof(reply)}, bytes_read, true, &extra_rights); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (auto result = mlibc::pmos::check_generic_errors(frg::span<uint8_t>{reinterpret_cast<uint8_t*>(&reply), bytes_read}); !result)
+        return result.error();
+
+    if (bytes_read < sizeof(IPC_Open_Reply))
         return EIO;
 
     if (reply.type != IPC_Open_Reply_NUM)
@@ -1198,17 +1196,16 @@ int Sysdeps<GetCwd>::operator()(char *buff, size_t size) {
     if (send_result.result != SUCCESS)
         return -send_result.result;
 
-    // TODO: Signal safety
+    frg::vector<uint8_t, SysdepsAllocator> reply_data(getSysdepsAllocator());
+    if (auto result = mlibc::pmos::handle_get_message_right(port, send_result.right, reply_data, true); !result)
+        return result.error();
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
+    if (auto result = mlibc::pmos::check_generic_errors({reply_data.begin(), reply_data.size()}); !result)
+        return result.error();
 
-    IPC_Getcwd_Reply *reply = (IPC_Getcwd_Reply *)alloca(reply_descr.size); 
-    result = get_first_message(reinterpret_cast<char *>(reply), reply_descr.size, MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    IPC_Getcwd_Reply *reply = (IPC_Getcwd_Reply *)reply_data.data(); 
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (reply_data.size() < sizeof(IPC_Getcwd_Reply))
         return EIO;
 
     if (reply->type != IPC_Getcwd_Reply_NUM)
@@ -1217,7 +1214,7 @@ int Sysdeps<GetCwd>::operator()(char *buff, size_t size) {
     if (reply->result_code < 0)
         return -reply->result_code;
 
-    size_t name_length = reply_descr.size - sizeof(IPC_Getcwd_Reply);
+    size_t name_length = reply_data.size() - sizeof(IPC_Getcwd_Reply);
     if (name_length + 1 > size)
         return ERANGE;
 
@@ -1454,17 +1451,16 @@ int Sysdeps<ReadEntries>::operator()(int handle, void *buffer, size_t max_size, 
         message.flags = res.value().flags;
     } while (true);
 
-    (void)reply_right;
-    // TODO: Signal safety here...
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
+    frg::vector<uint8_t, SysdepsAllocator> reply_data(getSysdepsAllocator());
+    if (auto result = mlibc::pmos::handle_get_message_right(port, reply_right, reply_data, true); !result)
+        return result.error();
 
-    IPC_Readdir_Reply *reply = (IPC_Readdir_Reply *)alloca(reply_descr.size);
-    result = get_first_message(reinterpret_cast<char *>(reply), reply_descr.size, MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    if (auto result = mlibc::pmos::check_generic_errors({reply_data.begin(), reply_data.size()}); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    IPC_Readdir_Reply *reply = (IPC_Readdir_Reply *)reply_data.data();
+
+    if (reply_data.size() < sizeof(IPC_Generic_Msg))
         return EIO;
 
     if (reply->type != IPC_Readdir_Reply_NUM)
@@ -1476,10 +1472,10 @@ int Sysdeps<ReadEntries>::operator()(int handle, void *buffer, size_t max_size, 
     auto d = static_cast<struct dirent *>(buffer);
 
     constexpr size_t header_size = sizeof(IPC_Readdir_Reply);
-    if (reply_descr.size < header_size)
+    if (reply_data.size() < header_size)
         return EIO;
 
-    size_t name_length = reply_descr.size - header_size;
+    size_t name_length = reply_data.size() - header_size;
     size_t dirent_length = sizeof(struct dirent) - sizeof(d->d_name) + name_length + 1;
     if (dirent_length > max_size)
         return ERANGE;
@@ -1608,8 +1604,6 @@ int Sysdeps<GetHostname>::operator()(char *buf, size_t bufsize)
 
 int Sysdeps<Uname>::operator()(struct utsname *buf)
 {
-    // TODO: Signal safety here
-
     IPC_Uname message = {
         .type = IPC_Uname_NUM,
         .flags = 0,
@@ -1623,29 +1617,29 @@ int Sysdeps<Uname>::operator()(struct utsname *buf)
     if (send_result.result != SUCCESS)
         return -send_result.result;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
+    IPC_Uname_Reply reply;
+    size_t bytes_read;
+    if (auto result = mlibc::pmos::handle_get_message_right(port, send_result.right, frg::span<uint8_t>{reinterpret_cast<uint8_t*>(&reply), sizeof(reply)}, bytes_read, true); !result)
+        return result.error();
 
-    IPC_Uname_Reply *reply = (IPC_Uname_Reply *)alloca(reply_descr.size);
-    result = get_first_message(reinterpret_cast<char *>(reply), reply_descr.size, MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    if (auto result = mlibc::pmos::check_generic_errors(frg::span<uint8_t>{reinterpret_cast<uint8_t*>(&reply), bytes_read}); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (bytes_read < sizeof(IPC_Uname_Reply))
         return EIO;
 
-    if (reply->type != IPC_Uname_Reply_NUM)
+    if (reply.type != IPC_Uname_Reply_NUM)
         return EIO;
 
-    if (reply->result_code < 0)
-        return -reply->result_code;
+    if (reply.result_code < 0)
+        return -reply.result_code;
 
-    memcpy(buf->sysname, reply->sysname, sizeof(buf->sysname));
-    memcpy(buf->nodename, reply->nodename, sizeof(buf->nodename));
-    memcpy(buf->release, reply->release, sizeof(buf->release));
-    memcpy(buf->version, reply->version, sizeof(buf->version));
-    memcpy(buf->machine, reply->machine, sizeof(buf->machine));
-    memcpy(buf->domainname, reply->domainname, sizeof(buf->domainname));
+    memcpy(buf->sysname, reply.sysname, sizeof(buf->sysname));
+    memcpy(buf->nodename, reply.nodename, sizeof(buf->nodename));
+    memcpy(buf->release, reply.release, sizeof(buf->release));
+    memcpy(buf->version, reply.version, sizeof(buf->version));
+    memcpy(buf->machine, reply.machine, sizeof(buf->machine));
+    memcpy(buf->domainname, reply.domainname, sizeof(buf->domainname));
 
     return 0;
 }

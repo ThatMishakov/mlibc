@@ -337,7 +337,6 @@ int Sysdeps<Open>::operator()(const char *pathname, int flags, mode_t mode, int 
     message->flags = flags | mode;
     memcpy(message->path, pathname, path_len);
 
-    // TODO: Signal safety here...
     auto port = mlibc::pmos::prepare_reply_port();
     if (port == INVALID_PORT)
         return EIO;
@@ -346,15 +345,10 @@ int Sysdeps<Open>::operator()(const char *pathname, int flags, mode_t mode, int 
     if (send_result.result != SUCCESS)
         return -send_result.result;
 
-    Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
-    __ensure(result == SUCCESS);
 
     pmos_right_t extra_rights[4] = {};
-    auto get_result = accept_rights(port, extra_rights);
-    __ensure(get_result == SUCCESS);
     frg::scope_exit delete_rights([&] {
-        for (size_t i = 0; i < 4; ++i) {
+    for (size_t i = 0; i < 4; ++i) {
             if (extra_rights[i] != INVALID_RIGHT) {
                 delete_right(extra_rights[i]);
             }
@@ -362,10 +356,14 @@ int Sysdeps<Open>::operator()(const char *pathname, int flags, mode_t mode, int 
     });
 
     IPC_Open_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
-    __ensure(result == SUCCESS);
+    size_t bytes_read;
+    if (auto result = mlibc::pmos::handle_get_message_right(port, send_result.right, frg::span<uint8_t>((uint8_t *)&reply, sizeof(reply)), bytes_read, false, &extra_rights); !result)
+        return result.error();
 
-    if (reply_descr.size < sizeof(IPC_Generic_Msg))
+    if (auto result = mlibc::pmos::check_generic_errors(frg::span<uint8_t>((uint8_t *)&reply, bytes_read)); !result)
+        return result.error();
+
+    if (bytes_read < sizeof(IPC_Open_Reply))
         return EIO;
 
     if (reply.type != IPC_Open_Reply_NUM)
@@ -411,16 +409,16 @@ int Sysdeps<Recvfrom>::operator()(int , void *, size_t , int , struct sockaddr *
 }
 
 int Sysdeps<Dup2>::operator()(int fd, int flags, int newfd) {
-    // TODO: Signal safety here
     if (fd >= __MLIBC_OPEN_MAX || fd < 0)
         return EBADF;
     if (newfd >= __MLIBC_OPEN_MAX || newfd < 0)
         return EBADF;
 
+    frg::unique_lock lock(filesystem_mutex);
+
     pmos_right_t io_right, op_right;
     unsigned file_flags;
     {
-        frg::unique_lock lock(filesystem_mutex);
         io_right = open_files[fd].io_right;
         op_right = open_files[fd].op_right;
         file_flags = open_files[fd].flags;
@@ -428,8 +426,6 @@ int Sysdeps<Dup2>::operator()(int fd, int flags, int newfd) {
 
     if (io_right == INVALID_RIGHT)
         return EBADF;
-
-    frg::unique_lock lock(filesystem_mutex);
 
     auto io_dup_result = dup_right(io_right);
     if (io_dup_result.result != SUCCESS)
