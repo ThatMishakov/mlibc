@@ -496,7 +496,7 @@ int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int
     __ensure(result == SUCCESS);
 
     pmos_right_t extra_rights[4] = {};
-    auto get_result = accept_rights(port, extra_rights);
+    auto get_result = accept_rights(port, reply_descr.message_id, extra_rights);
     __ensure(get_result == SUCCESS);
     frg::scope_exit delete_rights([&] {
         for (size_t i = 0; i < 4; ++i) {
@@ -507,7 +507,7 @@ int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int
     });
 
     IPC_Get_Object_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = read_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port, reply_descr.message_id).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -703,9 +703,8 @@ frg::expected<int, void> mlibc::pmos::check_generic_errors(frg::span<uint8_t> re
 namespace {
 
 frg::expected<int> handle_get_message_generic(pmos_port_t port, pmos_right_t right, auto &container, size_t &bytes_written, bool always_restart, pmos_right_t (*extra_rights)[4]) {
-    bool accepted_rights = false;
+    Message_Descriptor reply_descr;
     do {
-        Message_Descriptor reply_descr;
         auto result = syscall_get_message_info(&reply_descr, port, 0);
         if (result == -EINTR) {
             if (always_restart)
@@ -722,30 +721,25 @@ frg::expected<int> handle_get_message_generic(pmos_port_t port, pmos_right_t rig
             return kernel_to_errno(result);
         } else if (result != SUCCESS)
             return kernel_to_errno(result);
-
-        if constexpr (std::is_same_v<frg::vector<uint8_t, SysdepsAllocator>, std::remove_cvref_t<decltype(container)>>)
-            if (container.size() != reply_descr.size)
-                container.resize(reply_descr.size);
-
-        if (extra_rights && !accepted_rights) {
-            auto get_result = accept_rights(port, *extra_rights);
-            if (get_result == -EINTR)
-                continue;
-            if (get_result != SUCCESS)
-                return kernel_to_errno(get_result);
-            accepted_rights = true;
-        }
-
-        auto get_result = get_first_message((char *)container.data(), container.size(), MSG_ARG_REJECT_RIGHT, port);
-        if (get_result.result == -EINTR)
-            continue;
-
-        bytes_written = std::min<size_t>(reply_descr.size, container.size());
-
-        if (get_result.result != SUCCESS)
-            return kernel_to_errno(get_result.result);
-        return frg::success;
     } while (true);
+
+    if constexpr (std::is_same_v<frg::vector<uint8_t, SysdepsAllocator>, std::remove_cvref_t<decltype(container)>>)
+        if (container.size() != reply_descr.size)
+            container.resize(reply_descr.size);
+
+    if (extra_rights) {
+        auto get_result = accept_rights(port, reply_descr.message_id, *extra_rights);
+        __ensure(get_result == SUCCESS);
+    }
+
+    auto get_result = read_message((char *)container.data(), container.size(), MSG_ARG_REJECT_RIGHT, port, reply_descr.message_id);
+    __ensure(get_result.result == SUCCESS);
+
+    bytes_written = std::min<size_t>(reply_descr.size, container.size());
+
+    if (get_result.result != SUCCESS)
+        return kernel_to_errno(get_result.result);
+    return frg::success;
 }
 
 }

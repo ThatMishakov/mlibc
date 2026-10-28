@@ -197,10 +197,11 @@ result_t syscall_get_message_info(Message_Descriptor *descr, pmos_port_t port, u
  * @param max_size The maximum size of the buffer (or -1). The kernel copies min(max_size, message size)
  * @param args Aguments. MSG_ARG_NOPOP: do not pop the message after executing the command.
  *             MSG_ARG_REJECT_RIGHT: do not accept the reply right in the message.
+ * @param message_id ID of the message inside of the port. 0 gets the first/front message.
  * @return result of the execution. On success, buff should contain the message. If the message is
  *         poped, the reply right is returned.
  */
-right_request_t get_first_message(char *buff, size_t max_size, uint32_t args, pmos_port_t port);
+right_request_t read_message(char *buff, size_t max_size, uint32_t args, pmos_port_t port, uint64_t message_id);
 
 /**
  * @brief Chages the tasks' scheduler priority
@@ -523,9 +524,10 @@ right_request_t send_message_right(pmos_right_t send_right, pmos_port_t reply_po
 /// this function second time on the same message would result in accepting zero rights, as if the message
 /// did not have them in the first place.
 /// @param port Port from where the rights should be accepted
+/// @param message_id ID of the message inside of the port. 0 gets the front of the queue.
 /// @param rights_array Array of 4 rights, where they should be stored
 /// @return Result of the operation
-result_t accept_rights(pmos_port_t port, pmos_right_t *rights_array);
+result_t accept_rights(pmos_port_t port, uint64_t message_id, pmos_right_t *rights_array);
 
 /// @brief Watches a right for deletion
 ///

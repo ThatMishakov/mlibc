@@ -135,22 +135,22 @@ right_request_t watch_right(pmos_right_t right, pmos_port_t port)
     };
 }
 
-result_t accept_rights(pmos_port_t port, pmos_right_t *rights_array)
+result_t accept_rights(pmos_port_t port, uint64_t message_id, pmos_right_t *rights_array)
 {
     #ifdef __32BITSYSCALL
-    return syscall32_3(SYSCALL_ACCEPT_RIGHTS, (uint32_t)port, port >> 32, (uintptr_t)rights_array).result;
+    return syscall32_5(SYSCALL_ACCEPT_RIGHTS, (uint32_t)port, port >> 32, (uint32_t)message_id, message_id >> 32, (uintptr_t)rights_array).result;
     #else
-    return syscall2(SYSCALL_ACCEPT_RIGHTS, port, reinterpret_cast<uintptr_t>(rights_array)).result;
+    return syscall3(SYSCALL_ACCEPT_RIGHTS, port, message_id, reinterpret_cast<uintptr_t>(rights_array)).result;
     #endif
 }
 
-right_request_t get_first_message(char *buff, size_t max_size, uint32_t args, pmos_port_t port)
+right_request_t read_message(char *buff, size_t max_size, uint32_t args, pmos_port_t port, uint64_t message_id)
 {
     syscall_r result;
 #ifdef __32BITSYSCALL
-    result = syscall32_4(SYSCALL_GET_MESSAGE | (args << 8), (uint32_t)port, port >> 32, (unsigned)buff, max_size);
+    result = syscall32_6(SYSCALL_GET_MESSAGE | (args << 8), (uint32_t)port, port >> 32, (uint32_t)message_id, message_id >> 32, (unsigned)buff, max_size);
 #else
-    result = syscall3(SYSCALL_GET_MESSAGE | (args << 8), port, reinterpret_cast<uintptr_t>(buff), max_size);
+    result = syscall4(SYSCALL_GET_MESSAGE | (args << 8), port, message_id, reinterpret_cast<uintptr_t>(buff), max_size);
 #endif
     return (right_request_t) {
         .result = static_cast<result_t>(result.result),

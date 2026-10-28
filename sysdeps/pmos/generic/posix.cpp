@@ -230,7 +230,7 @@ static int create_new_process(uint64_t child_task_id, pid_t *child_pid, pmos_rig
     __ensure(result == SUCCESS);
 
     pmos_right_t extra_rights[4] = {};
-    auto get_result = accept_rights(port, extra_rights);
+    auto get_result = accept_rights(port, reply_descr.message_id, extra_rights);
     __ensure(get_result == SUCCESS);
     frg::scope_exit delete_rights([&] {
         for (size_t i = 0; i < 4; ++i) {
@@ -241,7 +241,7 @@ static int create_new_process(uint64_t child_task_id, pid_t *child_pid, pmos_rig
     });
 
     IPC_Register_Process_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = read_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port, reply_descr.message_id).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -542,7 +542,7 @@ int Sysdeps<Execve>::operator()(const char *path, char *const argv[], char *cons
     __ensure(result == SUCCESS);
 
     IPC_Execve_Reply reply;
-    result = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port).result;
+    result = read_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port, reply_descr.message_id).result;
     __ensure(result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg))
@@ -999,7 +999,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
         poll_entries[idx].receive_right.release();
 
         IPC_Poll_Reply reply;
-        auto fr = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port);
+        auto fr = read_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port, reply_descr.message_id);
         __ensure(fr.result == SUCCESS);
 
         if (reply_descr.size < sizeof(IPC_Generic_Msg)) {
@@ -1053,7 +1053,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
 
     unsigned idx = find_idx(reply_descr.sent_with_right);
     IPC_Poll_Reply reply;
-    auto fr = get_first_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port);
+    auto fr = read_message(reinterpret_cast<char *>(&reply), sizeof(reply), MSG_ARG_REJECT_RIGHT, port, reply_descr.message_id);
     __ensure(fr.result == SUCCESS);
 
     if (reply_descr.size < sizeof(IPC_Generic_Msg)) {

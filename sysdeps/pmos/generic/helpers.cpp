@@ -21,16 +21,16 @@ result_t get_message(Message_Descriptor *desc, unsigned char **message, pmos_por
         return -errno;
 
     if (other_rights) {
-        result_t result = accept_rights(port, other_rights);
-        assert(result == SUCCESS);
+        result_t result = accept_rights(port, desc->message_id, other_rights);
+        __ensure(result == SUCCESS);
     }
 
     if (reply_right) {
-        right_request_t r = get_first_message((char *)*message, desc->size, 0, port);
+        right_request_t r = read_message((char *)*message, desc->size, 0, port, desc->message_id);
         *reply_right = r.right;
         result = r.result;
     } else {
-        result = get_first_message((char *)*message, desc->size, MSG_ARG_REJECT_RIGHT, port).result;
+        result = read_message((char *)*message, desc->size, MSG_ARG_REJECT_RIGHT, port, desc->message_id).result;
     }
     if (result != SUCCESS) {
         free(*message);
