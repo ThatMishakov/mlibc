@@ -155,6 +155,8 @@ syscall_r get_right_type(pmos_right_t right);
 // instead
 #define FLAG_NOBLOCK 0x01
 
+#define FLAG_EXCLUDE_RIGHTS 0x02
+
 /**
  * @brief Blocks the process and upon the message reception, allocates memory with malloc(), and
  * fills it with the content. Internally, calls get_message_info() and get_first_message()

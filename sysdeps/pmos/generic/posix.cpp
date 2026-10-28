@@ -900,6 +900,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
     __ensure(num_events);
     *num_events = 0;
 
+    frg::vector<pmos_right_t, SysdepsAllocator> receive_rights(getSysdepsAllocator());
     frg::vector<Poll_Entry, SysdepsAllocator> poll_entries(getSysdepsAllocator());
     poll_entries.resize(nfds);
 
@@ -965,6 +966,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
             } else {
                 ++ipc_pending;
                 poll_entries[i].receive_right = RRH(port, send_result.right);
+                receive_rights.push_back(send_result.right);
             }
         }
     };
@@ -992,7 +994,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
     ipc_poll(true);
     while (ipc_pending > 0) {
         Message_Descriptor reply_descr;
-        auto result = syscall_get_message_info(&reply_descr, port, 0, 0);
+        auto result = syscall_select_message(&reply_descr, port, receive_rights.data(), receive_rights.size(), 0);
         __ensure(result == SUCCESS);
     
         unsigned idx = find_idx(reply_descr.sent_with_right);
@@ -1023,6 +1025,8 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
     if (*num_events > 0)
         return 0;
 
+    receive_rights.clear();
+
     RRH timer_receive_right(port, INVALID_RIGHT);
     if (timeout) {
         if (timespec_to_kernel(timeout) == 0) {
@@ -1032,6 +1036,8 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
         int timer_result = arm_timer(timeout, timer_receive_right.right);
         if (timer_result)
             return timer_result;
+
+        receive_rights.push_back(timer_receive_right.right);
     }
 
     // Do the same, but block this time; return when any event occurs, RAII will clean up the receive rights and duplicate messages
@@ -1042,7 +1048,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
     }
 
     Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0, 0);
+    auto result = syscall_select_message(&reply_descr, port, receive_rights.data(), receive_rights.size(), 0);
     __ensure(result == SUCCESS);
 
     if (reply_descr.sent_with_right == timer_receive_right.right) {

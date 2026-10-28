@@ -175,6 +175,9 @@ result_t syscall_set_task_name(uint64_t tid, const char *name, size_t name_lengt
  * 
  * The right search currently does a linear search through the message queue, with an assumption
  * that this usually wouldn't be called with a large number of pending messages.
+ * 
+ * syscall_select_message() offers the same functionality, but allowing to choose more than one right.
+ * However, it is more expensive due to necessary kernel memory allocations for the filter.
  *
  * @param descr Pointer to the valid memory region where the memory descriptor information is to be
  * filled
@@ -191,6 +194,20 @@ result_t syscall_set_task_name(uint64_t tid, const char *name, size_t name_lengt
  * information about the front message in the queue
  */
 result_t syscall_get_message_info(Message_Descriptor *descr, pmos_port_t port, pmos_right_t receive_right, uint32_t flags);
+
+/**
+ * @brief Similar to syscall_get_message_info(), but instead of one (or any) rights, it selects the first message that is either in the rights
+ * list, or excluding it. The rest of the function should be the same as syscall_get_message_info().
+ * @param descr Pointer to the valid memory region where the information about the first message is to be stored.
+ * @param port The port.
+ * @param receive_rights The array of rights to check against. The array memory size must be sizeof(pmos_right_t) * receive_rights_count.
+ * @param receive_rights_count The number of rights in the array. Must be > 0. 
+ * @param flags Flags for the operation. Takes FLAG_NONBLOCK and FLAG_EXCLUDE_RIGHTS. If FLAG_EXCLUDE_RIGHTS is set, the function will select the first message
+ * that is NOT in the rights list.
+ * @result The result of the operation. If the result is SUCCESS, the descr should have the information about the first message in the queue that matches the criteria.
+ * @see syscall_get_message_info() for more information about the function.
+ */
+result_t syscall_select_message(Message_Descriptor *descr, pmos_port_t port, const pmos_right_t *receive_rights, size_t receive_rights_count, uint32_t flags);
 
 /**
  * @brief Get the first message in the queue of the port. It is intended to be chained after

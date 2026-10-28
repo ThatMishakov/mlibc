@@ -168,6 +168,16 @@ result_t syscall_get_message_info(Message_Descriptor *descr, uint64_t port, uint
 #endif
 }
 
+result_t syscall_select_message(Message_Descriptor *descr, pmos_port_t port, const pmos_right_t *receive_rights, size_t receive_rights_count, uint32_t flags)
+{
+#ifdef __32BITSYSCALL
+    return syscall32_5(SYSCALL_SELECT_MESSAGE | (flags << 8), (uint32_t)port, port >> 32, (uintptr_t)receive_rights, receive_rights_count, (unsigned)descr)
+        .result;
+#else
+    return syscall4(SYSCALL_SELECT_MESSAGE | (flags << 8), port, reinterpret_cast<uintptr_t>(receive_rights), receive_rights_count, reinterpret_cast<uintptr_t>(descr)).result;
+#endif
+}
+
 right_request_t send_message_right(pmos_right_t send_right, pmos_port_t reply_port, const void *message,
                              size_t message_size, message_extra_t *aux_stuff, unsigned flags)
 {
