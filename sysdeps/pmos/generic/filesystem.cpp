@@ -721,6 +721,8 @@ frg::expected<int> handle_get_message_generic(pmos_port_t port, pmos_right_t rig
             return kernel_to_errno(result);
         } else if (result != SUCCESS)
             return kernel_to_errno(result);
+
+        break;
     } while (true);
 
     if constexpr (std::is_same_v<frg::vector<uint8_t, SysdepsAllocator>, std::remove_cvref_t<decltype(container)>>)
