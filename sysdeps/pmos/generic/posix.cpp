@@ -1023,7 +1023,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
     if (*num_events > 0)
         return 0;
 
-    RRH timer_receive_right;
+    RRH timer_receive_right(port, INVALID_RIGHT);
     if (timeout) {
         if (timespec_to_kernel(timeout) == 0) {
             return 0;
@@ -1046,8 +1046,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
     __ensure(result == SUCCESS);
 
     if (reply_descr.sent_with_right == timer_receive_right.right) {
-        timer_receive_right.release();
-        // Timeout
+        // The handler deletes the timer right and its queued expiration message.
         return 0;
     }
 
