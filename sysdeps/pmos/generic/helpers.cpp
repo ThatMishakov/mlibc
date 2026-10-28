@@ -12,7 +12,7 @@
 result_t get_message(Message_Descriptor *desc, unsigned char **message, pmos_port_t port,
                      pmos_right_t *reply_right, pmos_right_t *other_rights)
 {
-    result_t result = syscall_get_message_info(desc, port, 0);
+    result_t result = syscall_get_message_info(desc, port, 0, 0);
     if (result != SUCCESS)
         return result;
 

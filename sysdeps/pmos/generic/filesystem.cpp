@@ -491,7 +491,7 @@ int Sysdeps<VmMap>::operator()(void *hint, size_t size, int prot, int flags, int
         return -send_result.result;
 
     Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    auto result = syscall_get_message_info(&reply_descr, port, send_result.right, 0);
     // TODO: Handle EINTR
     __ensure(result == SUCCESS);
 
@@ -705,7 +705,7 @@ namespace {
 frg::expected<int> handle_get_message_generic(pmos_port_t port, pmos_right_t right, auto &container, size_t &bytes_written, bool always_restart, pmos_right_t (*extra_rights)[4]) {
     Message_Descriptor reply_descr;
     do {
-        auto result = syscall_get_message_info(&reply_descr, port, 0);
+        auto result = syscall_get_message_info(&reply_descr, port, right, 0);
         if (result == -EINTR) {
             if (always_restart)
                 continue;

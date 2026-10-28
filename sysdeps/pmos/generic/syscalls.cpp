@@ -158,13 +158,13 @@ right_request_t read_message(char *buff, size_t max_size, uint32_t args, pmos_po
     };
 }
 
-result_t syscall_get_message_info(Message_Descriptor *descr, uint64_t port, uint32_t flags)
+result_t syscall_get_message_info(Message_Descriptor *descr, uint64_t port, uint64_t right, uint32_t flags)
 {
 #ifdef __32BITSYSCALL
-    return syscall32_3(SYSCALL_GET_MSG_INFO | (flags << 8), (uint32_t)port, port >> 32, (unsigned)descr)
+    return syscall32_5(SYSCALL_GET_MSG_INFO | (flags << 8), (uint32_t)port, port >> 32, (uint32_t)right, right >> 32, (unsigned)descr)
         .result;
 #else
-    return syscall2(SYSCALL_GET_MSG_INFO | (flags << 8), port, reinterpret_cast<uintptr_t>(descr)).result;
+    return syscall3(SYSCALL_GET_MSG_INFO | (flags << 8), port, right, reinterpret_cast<uintptr_t>(descr)).result;
 #endif
 }
 

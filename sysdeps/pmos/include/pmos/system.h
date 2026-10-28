@@ -172,20 +172,25 @@ result_t syscall_set_task_name(uint64_t tid, const char *name, size_t name_lengt
  * either the process is blocked or the ERROR_NO_MESSAGES is returned.
  *
  * This system call does not modify the visible message queue state.
+ * 
+ * The right search currently does a linear search through the message queue, with an assumption
+ * that this usually wouldn't be called with a large number of pending messages.
  *
  * @param descr Pointer to the valid memory region where the memory descriptor information is to be
  * filled
  * @param port The port from which the message info should be gotten. Current task must be the owner
  * of the port.
+ * @param receive_right Right of the first message. 0 means the first message in the queue, otherwise
+ * this searches for the first message with the given receive right. The existance of the right is
+ * not checked and is up to the caller to ensure to avoid blocking indefinitely.
  * @param flags Different flags that can define the behaviour of the function. Unused bits must be
  * set to 0. Currently supported flags:
- * @param flags
  * @param flags FLAG_NOBLOCK - Do not block the process if the queue is empty and return an error
  * instead.
  * @return The result of the execution. If the execution was successfull, the descr should have the
  * information about the front message in the queue
  */
-result_t syscall_get_message_info(Message_Descriptor *descr, pmos_port_t port, uint32_t flags);
+result_t syscall_get_message_info(Message_Descriptor *descr, pmos_port_t port, pmos_right_t receive_right, uint32_t flags);
 
 /**
  * @brief Get the first message in the queue of the port. It is intended to be chained after

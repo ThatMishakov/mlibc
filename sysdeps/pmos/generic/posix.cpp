@@ -226,7 +226,7 @@ static int create_new_process(uint64_t child_task_id, pid_t *child_pid, pmos_rig
     }
 
     Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    auto result = syscall_get_message_info(&reply_descr, port, send_result.right, 0);
     __ensure(result == SUCCESS);
 
     pmos_right_t extra_rights[4] = {};
@@ -538,7 +538,7 @@ int Sysdeps<Execve>::operator()(const char *path, char *const argv[], char *cons
     }
 
     Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    auto result = syscall_get_message_info(&reply_descr, port, send_result.right, 0);
     __ensure(result == SUCCESS);
 
     IPC_Execve_Reply reply;
@@ -992,7 +992,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
     ipc_poll(true);
     while (ipc_pending > 0) {
         Message_Descriptor reply_descr;
-        auto result = syscall_get_message_info(&reply_descr, port, 0);
+        auto result = syscall_get_message_info(&reply_descr, port, 0, 0);
         __ensure(result == SUCCESS);
     
         unsigned idx = find_idx(reply_descr.sent_with_right);
@@ -1042,7 +1042,7 @@ int Sysdeps<Ppoll>::operator()(struct pollfd *fds, nfds_t nfds, const struct tim
     }
 
     Message_Descriptor reply_descr;
-    auto result = syscall_get_message_info(&reply_descr, port, 0);
+    auto result = syscall_get_message_info(&reply_descr, port, 0, 0);
     __ensure(result == SUCCESS);
 
     if (reply_descr.sent_with_right == timer_receive_right.right) {
