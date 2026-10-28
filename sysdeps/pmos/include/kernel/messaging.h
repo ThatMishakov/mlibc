@@ -44,6 +44,7 @@
 #define MESSAGE_FLAG_RIGHT_SEND_MANY  2
 #define MESSAGE_FLAG_RIGHT_MEM_OBJECT 3
 typedef struct {
+    u64 message_id;
     u64 sender;
     u64 sender_process;
     u64 size;
