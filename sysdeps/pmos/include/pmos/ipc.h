@@ -308,6 +308,26 @@ typedef struct IPC_Timer_Expired {
     uint64_t deadline;
 } IPC_Timer_Expired;
 
+#define IPC_Kernel_Process_Exited_NUM 0x29
+/// Message sent to the process right watcher when the process exits. If
+/// the right is destroyed, the normal IPC_Kernel_Right_Destroyed will be
+/// sent instead.
+typedef struct IPC_Kernel_Process_Exited {
+    /// @brief  Message type (must be IPC_Kernel_Process_Exited_NUM)
+    uint32_t type;
+
+    /// Flags
+    uint32_t flags;
+
+    /// ID of the process that exited
+    uint64_t process_id;
+
+    /// Exit code of the process
+    int32_t exit_code;
+
+    uint32_t reserved;
+} IPC_Kernel_Process_Exited;
+
 #define IPC_Faccessat_NUM 0x30
 typedef struct IPC_Faccessat {
     /// Message type (must be IPC_Faccessat_NUM)
