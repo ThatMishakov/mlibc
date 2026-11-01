@@ -367,6 +367,98 @@ static inline syscall_r syscall32_7(unsigned call_n_flags, uint32_t arg1, uint32
     return ret;
 }
 
+#elif defined(__aarch64__)
+static inline syscall_r syscall0(uint64_t call_n_flags)
+{
+    register uintptr_t x0 asm("x0") = call_n_flags, x1 asm("x1");
+    asm volatile("svc #0\n\t"
+                 : "+r"(x0), "=r"(x1)
+                 : "r"(x0)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)x0;
+    ret.value = x1;
+    return ret;
+}
+
+static inline syscall_r syscall1(uint64_t call_n_flags, uint64_t arg1)
+{
+    register uintptr_t x0 asm("x0") = call_n_flags, x1 asm("x1") = arg1;
+    asm volatile("svc #0\n\t"
+                 : "+r"(x0), "+r"(x1)
+                 : "r"(x0), "r"(x1)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)x0;
+    ret.value = x1;
+    return ret;
+}
+
+static inline syscall_r syscall2(uint64_t call_n_flags, uint64_t arg1, uint64_t arg2)
+{
+    register uintptr_t x0 asm("x0") = call_n_flags, x1 asm("x1") = arg1, x2 asm("x2") = arg2;
+    asm volatile("svc #0\n\t"
+                 : "+r"(x0), "+r"(x1)
+                 : "r"(x0), "r"(x1), "r"(x2)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)x0;
+    ret.value = x1;
+    return ret;
+}
+
+static inline syscall_r syscall3(uint64_t call_n_flags, uint64_t arg1, uint64_t arg2, uint64_t arg3)
+{
+    register uintptr_t x0 asm("x0") = call_n_flags, x1 asm("x1") = arg1, x2 asm("x2") = arg2, x3 asm("x3") = arg3;
+    asm volatile("svc #0\n\t"
+                 : "+r"(x0), "+r"(x1)
+                 : "r"(x0), "r"(x1), "r"(x2), "r"(x3)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)x0;
+    ret.value = x1;
+    return ret;
+}
+
+static inline syscall_r syscall4(uint64_t call_n_flags, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4)
+{
+    register uintptr_t x0 asm("x0") = call_n_flags, x1 asm("x1") = arg1, x2 asm("x2") = arg2, x3 asm("x3") = arg3, x4 asm("x4") = arg4;
+    asm volatile("svc #0\n\t"
+                 : "+r"(x0), "+r"(x1)
+                 : "r"(x0), "r"(x1), "r"(x2), "r"(x3), "r"(x4)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)x0;
+    ret.value = x1;
+    return ret;
+}
+
+static inline syscall_r syscall5(uint64_t call_n_flags, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5)
+{
+    register uintptr_t x0 asm("x0") = call_n_flags, x1 asm("x1") = arg1, x2 asm("x2") = arg2, x3 asm("x3") = arg3, x4 asm("x4") = arg4, x5 asm("x5") = arg5;
+    asm volatile("svc #0\n\t"
+                 : "+r"(x0), "+r"(x1)
+                 : "r"(x0), "r"(x1), "r"(x2), "r"(x3), "r"(x4), "r"(x5)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)x0;
+    ret.value = x1;
+    return ret;
+}
+
+static inline syscall_r syscall6(uint64_t call_n_flags, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5, uint64_t arg6)
+{
+    register uintptr_t x0 asm("x0") = call_n_flags, x1 asm("x1") = arg1, x2 asm("x2") = arg2, x3 asm("x3") = arg3, x4 asm("x4") = arg4, x5 asm("x5") = arg5, x6 asm("x6") = arg6;
+    asm volatile("svc #0\n\t"
+                 : "+r"(x0), "+r"(x1)
+                 : "r"(x0), "r"(x1), "r"(x2), "r"(x3), "r"(x4), "r"(x5), "r"(x6)
+                 : "memory");
+    syscall_r ret;
+    ret.result = (int64_t)x0;
+    ret.value = x1;
+    return ret;
+}
+
 #else
 #error "Unsupported architecture"
 #endif
