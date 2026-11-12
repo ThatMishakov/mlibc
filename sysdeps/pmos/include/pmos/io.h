@@ -193,6 +193,51 @@ inline uint64_t mmio_readd(uint64_t *ptr)
 
 #define pci_mmio_readl mmio_readl
 #define pci_mmio_writel mmio_writel
+#elif defined(__aarch64__)
+inline void mmio_writeb(uint8_t *ptr, uint8_t data)
+{
+    asm volatile("strb %w1, %0" : "=m"(*ptr) : "r"(data) : "memory");
+}
+inline void mmio_writeh(uint16_t *ptr, uint16_t data)
+{
+    asm volatile("strh %w1, %0" : "=m"(*ptr) : "r"(data) : "memory");
+}
+inline void mmio_writel(uint32_t *ptr, uint32_t data)
+{
+    asm volatile("str %w1, %0" : "=m"(*ptr) : "r"(data) : "memory");
+}
+inline void mmio_writed(uint64_t *ptr, uint64_t data)
+{
+    asm volatile("str %1, %0" : "=m"(*ptr) : "r"(data) : "memory");
+}
+
+inline uint8_t mmio_readb(uint8_t *ptr)
+{
+    uint8_t data;
+    asm volatile ("ldrb %w0, %1" : "=r"(data) : "m"(*ptr) : "memory");
+    return data;
+}
+inline uint16_t mmio_readh(uint16_t *ptr)
+{
+    uint16_t data;
+    asm volatile ("ldrh %w0, %1" : "=r"(data) : "m"(*ptr) : "memory");
+    return data;
+}
+inline uint32_t mmio_readl(uint32_t *ptr)
+{
+    uint32_t data;
+    asm volatile ("ldr %w0, %1" : "=r"(data) : "m"(*ptr): "memory");
+    return data;
+}
+inline uint64_t mmio_readd(uint64_t *ptr)
+{
+    uint64_t data;
+    asm volatile ("ldr %0, %1" : "=r"(data) : "m"(*ptr): "memory");
+    return data;
+}
+
+#define pci_mmio_readl mmio_readl
+#define pci_mmio_writel mmio_writel
 #endif
 
 #endif
