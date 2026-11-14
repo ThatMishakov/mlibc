@@ -43,6 +43,8 @@ int Sysdeps<TcbSet>::operator()(void *ptr) {
     auto tcb_ptr = ptr;
     #elif defined(__m68k__)
     auto tcb_ptr = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(ptr) + sizeof(Tcb) + 0x7000);
+    #elif defined(__aarch64__)
+    auto tcb_ptr = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(ptr) + sizeof(Tcb) - 0x10);
     #else
     auto tcb_ptr = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(ptr) + sizeof(Tcb));
     #endif
