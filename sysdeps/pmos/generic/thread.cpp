@@ -46,6 +46,7 @@ int Sysdeps<PrepareStack>::operator()(
 
 	void **stack_it = (void **)*stack;
 
+    *--stack_it = nullptr; // Alignment
 	*--stack_it = tcb;
 	*--stack_it = arg;
 	*--stack_it = entry;

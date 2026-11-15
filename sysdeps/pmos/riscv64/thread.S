@@ -7,7 +7,7 @@ __mlibc_thread_entry:
     ld a0, 0(sp)
     ld a1, 8(sp)
     ld a2, 16(sp)
-    addi sp, sp, 24
+    addi sp, sp, 32
     call __mlibc_thread_trampoline
     unimp
 

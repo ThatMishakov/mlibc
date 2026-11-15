@@ -7,6 +7,7 @@
     popq %rdi // entry
     popq %rsi // user_arg
     popq %rdx // tcb
+    addq $8, %rsp
 
     // Do a call so that the stack is aligned per the ABI
     call __mlibc_thread_trampoline

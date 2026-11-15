@@ -7,7 +7,7 @@ __mlibc_thread_entry:
 	ld.d $a0, $sp, 0
 	ld.d $a1, $sp, 8
 	ld.d $a2, $sp, 16
-	addi.d $sp, $sp, 24
+	addi.d $sp, $sp, 32
 	b __mlibc_thread_trampoline
 	break 0
 

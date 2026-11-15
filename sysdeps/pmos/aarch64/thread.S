@@ -7,7 +7,7 @@
 .cfi_startproc
  __mlibc_thread_entry:
     ldp x0, x1, [sp], #16
-    ldr x2, [sp], #8
+    ldr x2, [sp], #16
     bl __mlibc_thread_trampoline
     brk #0
 .cfi_endproc
