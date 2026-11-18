@@ -160,14 +160,6 @@ typedef struct IPC_Request_PCI_Device_GSI_Reply {
     uint32_t gsi;
 } IPC_Request_PCI_Device_GSI_Reply;
 
-// Replies with IPC_Request_Int_Reply
-#define IPC_Request_PCI_Interrupt_NUM 0x0E
-typedef struct IPC_Request_PCI_Interrupt {
-    uint32_t type;
-    uint16_t flags;
-    uint16_t pin;
-} IPC_Register_PCI_Interrupt;
-
 #define IPC_PCI_Read_NUM 0x0F
 typedef struct IPC_PCI_Read {
     uint32_t type;
@@ -202,12 +194,12 @@ typedef struct IPC_PCI_Write_Result {
 
 // Replies with IPC_Request_Int_Reply
 // To get several interrupts, send several IPC_Request_ACPI_Interrupt messages with different index, until there is -ENOENT in the reply
-#define IPC_Request_ACPI_Interrupt_NUM 0x13
-typedef struct IPC_Request_ACPI_Interrupt {
+#define IPC_Request_Interrupt_NUM 0x13
+typedef struct IPC_Request_Interrupt {
     uint32_t type;
     uint16_t flags;
     uint16_t index;
-} IPC_Request_ACPI_Interrupt;
+} IPC_Request_Interrupt;
 
 #define IPC_Kernel_Interrupt_NUM 0x20
 typedef struct IPC_Kernel_Interrupt {
