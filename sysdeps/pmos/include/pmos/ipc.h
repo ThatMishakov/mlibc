@@ -201,12 +201,13 @@ typedef struct IPC_Request_Interrupt {
     uint16_t index;
 } IPC_Request_Interrupt;
 
+// Bitmask for the IPC_Request_Resource
 enum {
-    IPC_DEVICE_RESOURCE_ANY     = 0,
-    IPC_DEVICE_RESOURCE_UNKNOWN = IPC_DEVICE_RESOURCE_ANY,
+    IPC_DEVICE_RESOURCE_UNKNOWN = 0,
     IPC_DEVICE_RESOURCE_IO_PORT = 1,
     IPC_DEVICE_RESOURCE_MMIO    = 2,
-    IPC_DEVICE_RESOURCE_IRQ     = 3,
+    IPC_DEVICE_RESOURCE_IRQ     = 4,
+    IPC_DEVICE_RESOURCE_ANY     = 0xFFFFFFFF,
 };
 
 #define IPC_Request_Resource_NUM 0x14
