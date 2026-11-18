@@ -59,6 +59,10 @@ inline uint32_t pci_mmio_readl(uint32_t *ptr)
     return data;
 }
 
+inline void pci_mmio_writew(uint16_t *ptr, uint16_t data)
+{
+    asm volatile("movw %w0, %1" :: "a"(data), "o"(*ptr) : "memory");
+}
 inline void pci_mmio_writel(uint32_t *ptr, uint32_t data)
 {
     asm volatile("movl %k0, %1" :: "a"(data), "o"(*ptr) : "memory");
@@ -142,6 +146,7 @@ inline void mmio_writed(uint64_t *ptr, uint64_t data)
 }
 
 #define pci_mmio_readl mmio_readl
+#define pci_mmio_writew mmio_writew
 #define pci_mmio_writel mmio_writel
 #endif
 
@@ -192,6 +197,7 @@ inline uint64_t mmio_readd(uint64_t *ptr)
 }
 
 #define pci_mmio_readl mmio_readl
+#define pci_mmio_writew mmio_writew
 #define pci_mmio_writel mmio_writel
 #elif defined(__aarch64__)
 inline void mmio_writeb(uint8_t *ptr, uint8_t data)
@@ -237,6 +243,7 @@ inline uint64_t mmio_readd(uint64_t *ptr)
 }
 
 #define pci_mmio_readl mmio_readl
+#define pci_mmio_writew mmio_writew
 #define pci_mmio_writel mmio_writel
 #endif
 

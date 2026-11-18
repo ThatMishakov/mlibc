@@ -201,6 +201,54 @@ typedef struct IPC_Request_Interrupt {
     uint16_t index;
 } IPC_Request_Interrupt;
 
+enum {
+    IPC_DEVICE_RESOURCE_ANY     = 0,
+    IPC_DEVICE_RESOURCE_UNKNOWN = IPC_DEVICE_RESOURCE_ANY,
+    IPC_DEVICE_RESOURCE_IO_PORT = 1,
+    IPC_DEVICE_RESOURCE_MMIO    = 2,
+    IPC_DEVICE_RESOURCE_IRQ     = 3,
+};
+
+#define IPC_Request_Resource_NUM 0x14
+typedef struct IPC_Request_Resource {
+    uint32_t type;
+    uint16_t flags;
+    #define LOOKUP_TYPE_DEFAULT 0
+    #define LOOKUP_TYPE_PCI_BAR 1
+    uint16_t lookup_type;
+    uint32_t resource_type;
+    uint32_t resource_index;
+    char resource_name[0]; 
+} IPC_Request_Resource;
+
+#define IPC_Get_Device_Type_NUM 0x015
+typedef struct IPC_Get_Device_Type {
+    uint32_t type;
+    uint32_t flags;
+} IPC_Get_Device_Type;
+
+enum {
+    IPC_DEVICE_TYPE_UNKNOWN = 0,
+    IPC_DEVICE_TYPE_PCI = 1,
+    IPC_DEVICE_TYPE_ACPI = 2,
+};
+
+#define IPC_Get_Device_Type_Reply_NUM 0x016
+typedef struct IPC_Get_Device_Type_Reply {
+    uint32_t type;
+    uint32_t device_type;
+} IPC_Get_Device_Type_Reply;
+
+#define IPC_Request_Resource_Reply_NUM 0x15
+typedef struct IPC_Request_Resource_Reply {
+    uint32_t type;
+    uint32_t flags;
+    int32_t result;
+    uint32_t resource_type;
+    uint64_t resource_start;
+    uint64_t resource_length;
+} IPC_Request_Resource_Reply;
+
 #define IPC_Kernel_Interrupt_NUM 0x20
 typedef struct IPC_Kernel_Interrupt {
     uint32_t type;
